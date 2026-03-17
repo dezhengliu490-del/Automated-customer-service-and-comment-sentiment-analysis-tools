@@ -4,7 +4,7 @@ from google import genai
 
 def main():
     # 1. 设置 API 密钥
-    api_key = "AIzaSyCY3h__s6UaNWQPHh0gmbTPnZDWi16V4GM"
+    api_key = ""
 
     # 2. 初始化 Gemini 客户端
     try:
@@ -14,7 +14,7 @@ def main():
         return
 
     # 3. 准备你要发送给模型的问题 (Prompt)
-    prompt = "请用三句话向初学者解释什么是机器学习。"
+    prompt = "请用三句话向初学者解释什么是机器学习。中英双语"
     print(f"正在发送请求...\n问题: {prompt}\n")
 
     # 4. 调用模型生成内容
