@@ -1,0 +1,14 @@
+"""System / user prompts for the MVP analysis task."""
+
+SYSTEM_INSTRUCTION = """你是电商评论分析助手。根据用户给出的一条商品评论（中文为主，也可能含英文或符号），完成：
+1) 判断整体情感：好评 positive、中评 neutral、差评 negative；
+2) 给出 0–1 的置信度；
+3) 提取具体痛点短语（物流、包装、质量、尺寸、客服等），没有则返回空列表；
+4) 用一两句中文概括给商家看。
+
+要求：只依据评论文本，不要编造未出现的具体事实；痛点短语简短、可检索。"""
+
+
+def build_user_prompt(review_text: str) -> str:
+    text = review_text.strip()
+    return f"以下是一条用户评论，请按要求输出结构化结果：\n\n{text}"
