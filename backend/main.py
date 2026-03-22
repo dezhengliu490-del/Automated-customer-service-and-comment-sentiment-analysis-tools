@@ -1,11 +1,19 @@
 """
 Week 3 backend entry: single text in -> Gemini -> structured JSON out.
 
-Usage (from `backend/` directory; use the same Python you installed deps with, e.g. `py -3.13`):
-  py -3.13 -m pip install -r requirements.txt
-  $env:GEMINI_API_KEY="..."   # PowerShell; or copy backend/.env.example to backend/.env
-  py -3.13 main.py "这条评论质量不错，就是物流有点慢"
-  py -3.13 main.py --file sample_review.txt
+安装依赖（在 backend 目录）:
+  py -3 -m pip install -r requirements.txt
+
+测试 main（会调用 Gemini API；密钥放在 backend/.env 或环境变量 GEMINI_API_KEY）:
+
+  在项目根目录（已激活 .venv 时可直接用 python）:
+    .venv/Scripts/python.exe backend/main.py "这条评论质量不错，就是物流有点慢"
+
+  或在 backend 目录:
+    python main.py "这条评论质量不错，就是物流有点慢"
+
+  从文件读入:
+    python main.py --file sample_review.txt
 """
 
 from __future__ import annotations
