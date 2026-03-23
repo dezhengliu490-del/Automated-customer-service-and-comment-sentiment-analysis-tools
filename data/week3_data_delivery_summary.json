@@ -1,0 +1,25 @@
+{
+  "deliverable": "Week3 Data Collection",
+  "description": "First batch of unprocessed raw reviews with unified schema",
+  "sampling": "random_sample_seed_20260323",
+  "records": 1000,
+  "schema": [
+    "review_id",
+    "category",
+    "label_raw",
+    "review_text",
+    "source_file"
+  ],
+  "category_distribution": {
+    "书籍": 48,
+    "平板": 171,
+    "手机": 37,
+    "水果": 156,
+    "洗发水": 160,
+    "热水器": 14,
+    "蒙牛": 42,
+    "衣服": 148,
+    "计算机": 58,
+    "酒店": 166
+  }
+}
