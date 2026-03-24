@@ -1,7 +1,7 @@
 """
-第三周前端（Streamlit）：数据上传与预览 + 抽样情感分析 + 单条分析。
+第三周前端（Streamlit）：提供数据上传、预览、抽样情感分析及单条分析功能。
 
-运行（项目根目录）:
+运行方式（在项目根目录执行）:
   python -m streamlit run frontend/app.py
 """
 
@@ -13,7 +13,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-# --- 接入后端 ---
+# --- 接入后端服务 ---
+# 定位项目根目录和后端目录，确保可以导入 backend 中的模块
 _ROOT = Path(__file__).resolve().parent.parent
 _BACKEND = _ROOT / "backend"
 if str(_BACKEND) not in sys.path:
@@ -21,13 +22,17 @@ if str(_BACKEND) not in sys.path:
 
 from google.genai import errors as genai_errors  # noqa: E402
 
+# 导入后端核心分析函数
 from gemini_service import analyze_review_text_as_dict  # noqa: E402
 
+# 导入前端工具函数：加载数据表
 from utils.loaders import load_dataframe  # noqa: E402
 
-SS_DF = "workspace_df"
-SS_NAME = "workspace_filename"
+# 定义 Session State 中的键名常量
+SS_DF = "workspace_df"          # 存储加载的 DataFrame
+SS_NAME = "workspace_filename"    # 存储上传的文件名
 
+# 配置 Streamlit 页面属性
 st.set_page_config(
     page_title="评论情感分析 · MVP",
     page_icon="📊",
@@ -35,7 +40,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# --- 侧边栏配置 ---
 with st.sidebar:
+    # 语言切换单选框
     lang_choice = st.radio(
         "Language / 语言",
         options=["中文", "English"],
@@ -45,51 +52,54 @@ with st.sidebar:
     )
     lang = "zh" if lang_choice == "中文" else "en"
 
+    # 多语言文案字典
     I18N = {
         "zh": {
             "sidebar_header": "第三周 · 前端",
-            "sidebar_bullets": "- **上传 CSV / Excel** → 预览\n- **选列 + 抽样**：对前 N 条调用后端 Gemini\n- **单条**：手动输入一条评论",
-            "sidebar_backend": "后端：`{backend}`",
-            "sidebar_secret": "密钥：`backend/.env` → `GEMINI_API_KEY`",
-            "page_title": "自动化客服与评论情感分析",
-            "page_subtitle": "**阶段一 · Week 3**：上传预览与少量数据的情感分析（与 `gemini_service` 一致）。",
-            "tab_batch": "数据上传 · 预览 · 抽样分析",
-            "tab_single": "单条情感分析",
-            "expander_upload": "① 上传数据文件",
-            "file_uploader_label": "选择 CSV 或 Excel",
-            "info_wait_upload": "请先在上方的「上传数据文件」中选择 CSV 或 Excel。",
-            "btn_clear": "清除已加载的数据",
-            "subheader_preview": "数据预览",
-            "metric_rows": "行数",
-            "metric_cols": "列数",
-            "metric_file": "文件",
-            "subheader_sample": "抽样情感分析",
-            "caption_sample": "从表格**最前面**连续取 N 行，对指定列文本逐条调用后端 `analyze_review_text_as_dict`（受 API 配额与耗时限制，N 不宜过大）。",
-            "selectbox_col": "评论文本所在列",
-            "slider_n": "分析条数 N（取前 N 行）",
-            "btn_start": "开始抽样分析",
-            "progress_preparing": "准备中…",
-            "progress_done": "完成",
-            "expander_coltypes": "列类型",
-            "download_csv": "下载分析结果 CSV",
-            "subheader_single": "单条评论 → 结构化 JSON",
-            "caption_single": "与 `backend/main.py` 相同逻辑。",
-            "label_text": "评论原文",
-            "placeholder_text": "例如：这条评论质量不错，就是物流有点慢",
-            "btn_single": "调用后端分析",
-            "warn_empty_text": "请输入非空评论文本。",
-            "spinner_calling": "正在调用 Gemini…",
-            "error_api": "Gemini API 错误：{e}",
-            "error_runtime": "{e}",
-            "success_done": "分析完成",
-            "section_summary": "**摘要**",
-            "section_sentiment": "**情感** · **置信度**",
-            "section_pain_points": "**痛点**",
-            # 输出列名（UI 友好，和 backend keys 不冲突）
-            "col_index": "行索引",
-            "col_excerpt": "原文片段",
-            "col_pain_points": "痛点",
-            "summary_empty_skipped": "（空文本，已跳过）",
+            "sidebar_bullets": "- **上传 CSV / Excel** → 预览\n- **选列 + 抽样**：对前 N 条调用后端 Gemini\n- **单条**：手动输入一条评论数据",
+            "sidebar_backend": "后端目录：`{backend}`",
+            "sidebar_secret": "密钥检查：`backend/.env` → `GEMINI_API_KEY`",
+            "page_title": "自动化客服与评论情感分析系统",
+            "page_subtitle": "**阶段一 · Week 3**：实现数据上传预览与抽样情感分析（基于 `gemini_service`）。",
+            "tab_batch": "批量上传 · 预览 · 抽样分析",
+            "tab_single": "单条评论分析",
+            "expander_upload": "① 第一步：上传数据文件",
+            "file_uploader_label": "请选择 CSV 或 Excel 文件",
+            "info_wait_upload": "请先通过上方的“上传数据文件”按钮加载 CSV 或 Excel 数据。",
+            "btn_clear": "清空已加载数据",
+            "subheader_preview": "数据预览区",
+            "metric_rows": "总行数",
+            "metric_cols": "总列数",
+            "metric_file": "当前文件",
+            "subheader_sample": "抽样分析测试",
+            "caption_sample": "从表格**最前面**连续提取 N 条数据，对指定列进行情感分析（注意 API 配额限制，N 不宜设置过大）。",
+            "selectbox_col": "请选择包含评论文本的列",
+            "slider_n": "抽样条数 N（取前 N 条进行分析）",
+            "btn_start": "开始执行抽样分析",
+            "progress_preparing": "正在准备数据…",
+            "progress_done": "分析完成",
+            "expander_coltypes": "查看数据列类型",
+            "download_csv": "导出分析结果为 CSV",
+            "subheader_single": "单条评论交互分析",
+            "caption_single": "执行与 `backend/main.py` 相同的分析逻辑。",
+            "label_text": "请输入评论内容",
+            "placeholder_text": "例：该商品质量非常好，完全符合描述！",
+            "btn_single": "立即调用后端分析",
+            "warn_empty_text": "输入的评论文本不能为空，请重新输入。",
+            "spinner_calling": "Gemini 正在冥思苦想中…",
+            "error_api": "Gemini API 调用异常：{e}",
+            "error_runtime": "运行时错误：{e}",
+            "success_done": "分析已圆满完成",
+            "section_summary": "**总结摘要**",
+            "section_sentiment": "**情感倾向** · **置信得分**",
+            "section_pain_points": "**核心痛点**",
+            "col_index": "原行号",
+            "col_excerpt": "评论摘录",
+            "col_pain_points": "识别痛点",
+            "summary_empty_skipped": "（文本为空，已自动跳过）",
+            "tag_positive": "好评",
+            "tag_negative": "差评",
+            "tag_neutral": "中评"
         },
         "en": {
             "sidebar_header": "Week 3 · Frontend",
@@ -145,15 +155,18 @@ with st.sidebar:
     st.caption(d["sidebar_backend"].format(backend=_BACKEND))
     st.caption(d["sidebar_secret"])
 
+# --- 页面标题 ---
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
 
+# 创建顶部标签页
 tab_batch, tab_single = st.tabs([d["tab_batch"], d["tab_single"]])
 
 # --------------------------------------------------------------------------- #
-# 共享：加载文件写入 session_state
+# 文件处理区域：上传并写入 session_state
 # --------------------------------------------------------------------------- #
 with st.expander(d["expander_upload"], expanded=True):
+    # 文件上传器
     uploaded = st.file_uploader(
         d["file_uploader_label"],
         type=["csv", "xlsx", "xls"],
@@ -161,35 +174,40 @@ with st.expander(d["expander_upload"], expanded=True):
     )
     if uploaded is not None:
         try:
+            # 调用 utils/loaders.py 中的函数读取数据
             df_new = load_dataframe(uploaded)
         except Exception as e:
             if lang == "zh":
-                st.error(f"读取失败：{e}")
+                st.error(f"数据读取失败：{e}")
             else:
                 st.error(f"Failed to read file: {e}")
         else:
+            # 将读取的 DataFrame 存入 session_state 实现页面刷新不丢失数据
             st.session_state[SS_DF] = df_new
             st.session_state[SS_NAME] = uploaded.name
             if lang == "zh":
-                st.success(f"已加载：**{uploaded.name}**（{len(df_new):,} 行）")
+                st.success(f"成功加载文件：**{uploaded.name}**（共 {len(df_new):,} 行）")
             else:
                 st.success(f"Loaded: **{uploaded.name}** ({len(df_new):,} rows)")
 
+    # 提供清空数据的按钮
     if st.session_state.get(SS_DF) is not None:
         if st.button(d["btn_clear"]):
             st.session_state.pop(SS_DF, None)
             st.session_state.pop(SS_NAME, None)
             st.rerun()
 
+# 尝试获取当前已加载的数据框
 df = st.session_state.get(SS_DF)
 
 # --------------------------------------------------------------------------- #
-# Tab：上传 + 预览 + 抽样分析
+# 标签页一：批量上传 + 预览 + 抽样分析逻辑
 # --------------------------------------------------------------------------- #
 with tab_batch:
     if df is None:
         st.info(d["info_wait_upload"])
     else:
+        # 1. 数据统计指标展示
         st.subheader(d["subheader_preview"])
         name = st.session_state.get(SS_NAME, "—")
         c1, c2, c3 = st.columns(3)
@@ -200,8 +218,10 @@ with tab_batch:
         with c3:
             st.metric(d["metric_file"], name[:28] + ("…" if len(str(name)) > 28 else ""))
 
+        # 2. 数据预览表格
         st.dataframe(df, use_container_width=True, height=min(420, 120 + min(len(df), 12) * 28))
 
+        # 3. 抽样分析配置区
         st.subheader(d["subheader_sample"])
         st.caption(d["caption_sample"])
 
@@ -210,6 +230,7 @@ with tab_batch:
         default_n = min(5, max_n)
         n_rows = st.slider(d["slider_n"], 1, max_n, default_n)
 
+        # 4. 执行抽样分析
         if st.button(d["btn_start"], type="primary"):
             sample = df.head(n_rows)
             texts = sample[col_text]
@@ -217,14 +238,17 @@ with tab_batch:
             results_rows: list[dict] = []
             progress = st.progress(0.0, text=d["progress_preparing"])
 
+            # 循环调用后端 API 逐行分析
             for i, (idx, raw) in enumerate(texts.items()):
+                # 设置当前进度条的显示文字
                 if lang == "zh":
-                    label = f"第 {i + 1}/{len(texts)} 条"
+                    label = f"正在分析第 {i + 1}/{len(texts)} 条评论"
                 else:
-                    label = f"Item {i + 1}/{len(texts)}"
+                    label = f"Analyzing Item {i + 1}/{len(texts)}"
                 progress.progress((i) / max(len(texts), 1), text=label)
 
                 cell = raw
+                # 跳过空文本
                 if pd.isna(cell) or str(cell).strip() == "":
                     results_rows.append(
                         {
@@ -242,6 +266,7 @@ with tab_batch:
                 preview = text_full if len(text_full) <= 80 else text_full[:77] + "…"
 
                 try:
+                    # **核心：调用后端接入 Gemini 的函数**
                     r = analyze_review_text_as_dict(text_full)
                 except genai_errors.ClientError as e:
                     results_rows.append(
@@ -266,6 +291,7 @@ with tab_batch:
                         }
                     )
                 else:
+                    # 汇总后端返回的结构化 JSON 数据
                     pp = r.get("pain_points") or []
                     results_rows.append(
                         {
@@ -278,15 +304,18 @@ with tab_batch:
                         }
                     )
 
+            # 更新进度条完成状态
             progress.progress(1.0, text=d["progress_done"])
 
+            # 展示分析结果表格
             out_df = pd.DataFrame(results_rows)
             if lang == "zh":
-                st.success(f"已完成 {len(results_rows)} 条分析。")
+                st.success(f"已圆满完成 {len(results_rows)} 条数据的深度分析。")
             else:
                 st.success(f"Finished {len(results_rows)} rows.")
             st.dataframe(out_df, use_container_width=True)
 
+            # 提供结果下载按钮
             csv_bytes = out_df.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 label=d["download_csv"],
@@ -295,40 +324,49 @@ with tab_batch:
                 mime="text/csv",
             )
 
+        # 辅助功能：展示每列的数据类型
         with st.expander(d["expander_coltypes"]):
             st.dataframe(df.dtypes.rename("dtype").to_frame(), use_container_width=True)
 
 # --------------------------------------------------------------------------- #
-# Tab：单条
+# 标签页二：单条评论实时交互分析
 # --------------------------------------------------------------------------- #
 with tab_single:
     st.subheader(d["subheader_single"])
     st.caption(d["caption_single"])
+    
+    # 评论文本输入框
     text = st.text_area(
         d["label_text"],
         height=160,
         placeholder=d["placeholder_text"],
     )
+    
     if st.button(d["btn_single"], type="primary"):
         if not text or not str(text).strip():
             st.warning(d["warn_empty_text"])
         else:
             with st.spinner(d["spinner_calling"]):
                 try:
+                    # 直接调用后端函数
                     result = analyze_review_text_as_dict(text.strip())
                 except genai_errors.ClientError as e:
                     st.error(d["error_api"].format(e=e))
-                except RuntimeError as e:
-                    st.error(d["error_runtime"].format(e=e))
-                except ValueError as e:
+                except (RuntimeError, ValueError) as e:
                     st.error(d["error_runtime"].format(e=e))
                 else:
+                    # 格式化展示结果
                     st.success(d["success_done"])
+                    # 展示原始 JSON 结构
                     st.json(result)
+                    
+                    # 使用 Markdown 分区块展示具体字段
                     st.markdown(d["section_summary"])
                     st.write(result.get("summary_zh", ""))
+                    
                     st.markdown(d["section_sentiment"])
                     st.write(f"{result.get('sentiment')} · {result.get('confidence')}")
+                    
                     if result.get("pain_points"):
                         st.markdown(d["section_pain_points"])
                         for p in result["pain_points"]:
