@@ -11,6 +11,7 @@ import sys
 import asyncio
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -29,12 +30,15 @@ from gemini_service import (
     async_analyze_review_text_as_dict
 )  # noqa: E402
 
-# 导入前端工具函数：加载数据表
+# 导入前端工具函数：加载数据表、清洗
+from utils.cleaning import clean_review_dataframe  # noqa: E402
 from utils.loaders import load_dataframe  # noqa: E402
 
 # 定义 Session State 中的键名常量
 SS_DF = "workspace_df"          # 存储加载的 DataFrame
 SS_NAME = "workspace_filename"    # 存储上传的文件名
+SS_CLEAN_DF = "workspace_df_cleaned"  # 清洗后的表
+SS_CLEAN_STATS = "workspace_clean_stats"  # 清洗统计信息
 
 # 配置 Streamlit 页面属性
 st.set_page_config(
@@ -103,7 +107,25 @@ with st.sidebar:
             "summary_empty_skipped": "（文本为空，已自动跳过）",
             "tag_positive": "好评",
             "tag_negative": "差评",
-            "tag_neutral": "中评"
+            "tag_neutral": "中评",
+            "subheader_clean": "数据清洗（Pandas）",
+            "caption_clean": "去除重复行、空评论与不可见控制字符；清洗后可用于预览与抽样分析。",
+            "clean_select_col": "评论文本列（用于清洗）",
+            "clean_opt_empty": "去除清洗后仍为空的行",
+            "clean_opt_dup_text": "按评论文本去重（保留首条）",
+            "clean_opt_dup_row": "去除完全重复的行（所有列相同）",
+            "btn_apply_clean": "应用清洗",
+            "clean_ok": "清洗完成。",
+            "clean_stats_line": "原始 {rows_in} 行 → 清洗后 {rows_out} 行；去空 {empty}；文本重复 {dup_t}；整行重复 {dup_r}",
+            "radio_data_source": "当前使用的数据",
+            "source_raw": "原始数据",
+            "source_cleaned": "清洗后数据",
+            "warn_no_clean": "尚未执行清洗，已继续使用原始数据。",
+            "subheader_chart": "情感分布（抽样结果）",
+            "caption_chart": "基于本次抽样结果中有效 sentiment 字段的条数统计。",
+            "chart_empty": "没有可用于统计的有效情感标签（请确认分析成功且 sentiment 为 positive/neutral/negative）。",
+            "chart_label_count": "条数",
+            "chart_axis_x": "情感类别",
         },
         "en": {
             "sidebar_header": "Week 3 · Frontend",
@@ -148,6 +170,27 @@ with st.sidebar:
             "col_excerpt": "Text excerpt",
             "col_pain_points": "Pain points",
             "summary_empty_skipped": "(Empty text, skipped)",
+            "tag_positive": "Positive",
+            "tag_negative": "Negative",
+            "tag_neutral": "Neutral",
+            "subheader_clean": "Data cleaning (Pandas)",
+            "caption_clean": "Drop duplicates / empty rows / control characters; use cleaned rows for preview & sampling.",
+            "clean_select_col": "Text column for cleaning",
+            "clean_opt_empty": "Drop rows empty after cleaning",
+            "clean_opt_dup_text": "Drop duplicate text (keep first)",
+            "clean_opt_dup_row": "Drop duplicate rows (all columns identical)",
+            "btn_apply_clean": "Apply cleaning",
+            "clean_ok": "Cleaning done.",
+            "clean_stats_line": "{rows_in} rows → {rows_out}; empty dropped {empty}; dup text {dup_t}; dup row {dup_r}",
+            "radio_data_source": "Dataset for analysis",
+            "source_raw": "Raw",
+            "source_cleaned": "Cleaned",
+            "warn_no_clean": "No cleaned dataset yet; using raw data.",
+            "subheader_chart": "Sentiment distribution (sample)",
+            "caption_chart": "Counts of valid sentiment labels in this sample run.",
+            "chart_empty": "No valid sentiment values to chart.",
+            "chart_label_count": "Count",
+            "chart_axis_x": "Sentiment",
         },
     }
 
@@ -189,6 +232,9 @@ with st.expander(d["expander_upload"], expanded=True):
             # 将读取的 DataFrame 存入 session_state 实现页面刷新不丢失数据
             st.session_state[SS_DF] = df_new
             st.session_state[SS_NAME] = uploaded.name
+            st.session_state.pop(SS_CLEAN_DF, None)
+            st.session_state.pop(SS_CLEAN_STATS, None)
+            st.session_state.pop("batch_data_source_radio", None)
             if lang == "zh":
                 st.success(f"成功加载文件：**{uploaded.name}**（共 {len(df_new):,} 行）")
             else:
@@ -199,6 +245,9 @@ with st.expander(d["expander_upload"], expanded=True):
         if st.button(d["btn_clear"]):
             st.session_state.pop(SS_DF, None)
             st.session_state.pop(SS_NAME, None)
+            st.session_state.pop(SS_CLEAN_DF, None)
+            st.session_state.pop(SS_CLEAN_STATS, None)
+            st.session_state.pop("batch_data_source_radio", None)
             st.rerun()
 
 # 尝试获取当前已加载的数据框
@@ -211,32 +260,99 @@ with tab_batch:
     if df is None:
         st.info(d["info_wait_upload"])
     else:
-        # 1. 数据统计指标展示
+        # --- Pandas 清洗（去重 / 空值 / 异常字符）---
+        with st.expander(d["subheader_clean"], expanded=False):
+            st.caption(d["caption_clean"])
+            clean_col = st.selectbox(
+                d["clean_select_col"],
+                list(df.columns),
+                index=0,
+                key="clean_text_column",
+            )
+            opt_empty = st.checkbox(d["clean_opt_empty"], value=True, key="clean_opt_empty")
+            opt_dup_text = st.checkbox(d["clean_opt_dup_text"], value=True, key="clean_opt_dup_text")
+            opt_dup_row = st.checkbox(d["clean_opt_dup_row"], value=False, key="clean_opt_dup_row")
+            if st.button(d["btn_apply_clean"], key="btn_apply_clean"):
+                try:
+                    cleaned, stats = clean_review_dataframe(
+                        df,
+                        clean_col,
+                        drop_duplicate_text=opt_dup_text,
+                        drop_empty_text=opt_empty,
+                        drop_full_row_duplicates=opt_dup_row,
+                    )
+                except Exception as e:
+                    if lang == "zh":
+                        st.error(f"清洗失败：{e}")
+                    else:
+                        st.error(f"Cleaning failed: {e}")
+                else:
+                    st.session_state[SS_CLEAN_DF] = cleaned
+                    st.session_state[SS_CLEAN_STATS] = stats
+                    st.session_state["batch_data_source_radio"] = d["source_cleaned"]
+                    st.success(d["clean_ok"])
+                    st.caption(
+                        d["clean_stats_line"].format(
+                            rows_in=stats["rows_in"],
+                            rows_out=stats["rows_out"],
+                            empty=stats["empty_dropped"],
+                            dup_t=stats["dup_text_dropped"],
+                            dup_r=stats["dup_row_dropped"],
+                        )
+                    )
+                    st.rerun()
+
+        cleaned_df = st.session_state.get(SS_CLEAN_DF)
+        source_pick = st.radio(
+            d["radio_data_source"],
+            [d["source_raw"], d["source_cleaned"]],
+            horizontal=True,
+            key="batch_data_source_radio",
+        )
+        if source_pick == d["source_cleaned"]:
+            if cleaned_df is None:
+                st.warning(d["warn_no_clean"])
+                df_work = df
+            else:
+                df_work = cleaned_df
+        else:
+            df_work = df
+
+        # 1. 数据统计指标展示（基于当前选用的表）
         st.subheader(d["subheader_preview"])
         name = st.session_state.get(SS_NAME, "—")
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.metric(d["metric_rows"], f"{len(df):,}")
+            st.metric(d["metric_rows"], f"{len(df_work):,}")
         with c2:
-            st.metric(d["metric_cols"], len(df.columns))
+            st.metric(d["metric_cols"], len(df_work.columns))
         with c3:
             st.metric(d["metric_file"], name[:28] + ("…" if len(str(name)) > 28 else ""))
 
         # 2. 数据预览表格
-        st.dataframe(df, use_container_width=True, height=min(420, 120 + min(len(df), 12) * 28))
+        st.caption(
+            f"**{d['source_cleaned']}** · {len(cleaned_df):,} / **{d['source_raw']}** · {len(df):,}"
+            if cleaned_df is not None
+            else f"**{d['source_raw']}** · {len(df):,}"
+        )
+        st.dataframe(
+            df_work,
+            use_container_width=True,
+            height=min(420, 120 + min(len(df_work), 12) * 28),
+        )
 
         # 3. 抽样分析配置区
         st.subheader(d["subheader_sample"])
         st.caption(d["caption_sample"])
 
-        col_text = st.selectbox(d["selectbox_col"], list(df.columns), index=0)
-        max_n = min(30, len(df))
+        col_text = st.selectbox(d["selectbox_col"], list(df_work.columns), index=0)
+        max_n = min(30, len(df_work))
         default_n = min(5, max_n)
         n_rows = st.slider(d["slider_n"], 1, max_n, default_n)
 
         # 4. 执行抽样分析
         if st.button(d["btn_start"], type="primary"):
-            sample = df.head(n_rows)
+            sample = df_work.head(n_rows)
             texts = sample[col_text]
 
             results_rows: list[dict] = []
@@ -325,9 +441,71 @@ with tab_batch:
                 mime="text/csv",
             )
 
-        # 辅助功能：展示每列的数据类型
+            # 情感分布柱状图（抽样结果）
+            st.subheader(d["subheader_chart"])
+            st.caption(d["caption_chart"])
+            label_map = {
+                "positive": d["tag_positive"],
+                "neutral": d["tag_neutral"],
+                "negative": d["tag_negative"],
+            }
+            if "sentiment" in out_df.columns:
+                ser = (
+                    out_df["sentiment"]
+                    .astype(str)
+                    .str.strip()
+                )
+                ser = ser[ser.isin(["positive", "neutral", "negative"])]
+                if ser.empty:
+                    st.info(d["chart_empty"])
+                else:
+                    counts = ser.value_counts()
+                    order = ["positive", "neutral", "negative"]
+                    idx_order = [x for x in order if x in counts.index]
+                    counts = counts.reindex(idx_order + [x for x in counts.index if x not in idx_order]).fillna(0).astype(int)
+                    chart_df = pd.DataFrame(
+                        {d["chart_label_count"]: counts.values},
+                        index=[label_map.get(k, k) for k in counts.index],
+                    )
+                    plot_df = chart_df.reset_index()
+                    plot_df.columns = ["sentiment_label", "count_value"]
+                    bar = (
+                        alt.Chart(plot_df)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X(
+                                "sentiment_label:N",
+                                sort=None,
+                                title=d["chart_axis_x"],
+                                axis=alt.Axis(
+                                    labelAngle=0,
+                                    labelOverlap=False,
+                                ),
+                            ),
+                            y=alt.Y(
+                                "count_value:Q",
+                                title=d["chart_label_count"],
+                            ),
+                            tooltip=[
+                                alt.Tooltip(
+                                    "sentiment_label:N",
+                                    title=d["chart_axis_x"],
+                                ),
+                                alt.Tooltip(
+                                    "count_value:Q",
+                                    title=d["chart_label_count"],
+                                ),
+                            ],
+                        )
+                        .properties(height=320)
+                    )
+                    st.altair_chart(bar, use_container_width=True)
+            else:
+                st.info(d["chart_empty"])
+
+        # 辅助功能：展示每列的数据类型（与当前预览表一致）
         with st.expander(d["expander_coltypes"]):
-            st.dataframe(df.dtypes.rename("dtype").to_frame(), use_container_width=True)
+            st.dataframe(df_work.dtypes.rename("dtype").to_frame(), use_container_width=True)
 
 # --------------------------------------------------------------------------- #
 # 标签页二：单条评论实时交互分析
