@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import sys
+import asyncio
 from pathlib import Path
 
 import pandas as pd
@@ -23,7 +24,10 @@ if str(_BACKEND) not in sys.path:
 from google.genai import errors as genai_errors  # noqa: E402
 
 # 导入后端核心分析函数
-from gemini_service import analyze_review_text_as_dict  # noqa: E402
+from gemini_service import (
+    analyze_review_text_as_dict,
+    async_analyze_review_text_as_dict
+)  # noqa: E402
 
 # 导入前端工具函数：加载数据表
 from utils.loaders import load_dataframe  # noqa: E402
@@ -72,7 +76,7 @@ with st.sidebar:
             "metric_cols": "总列数",
             "metric_file": "当前文件",
             "subheader_sample": "抽样分析测试",
-            "caption_sample": "从表格**最前面**连续提取 N 条数据，对指定列进行情感分析（注意 API 配额限制，N 不宜设置过大）。",
+            "caption_sample": "从表格**最前面**连续提取 N 条数据，对指定列进行情感分析（并发执行提高效率）。",
             "selectbox_col": "请选择包含评论文本的列",
             "slider_n": "抽样条数 N（取前 N 条进行分析）",
             "btn_start": "开始执行抽样分析",
@@ -119,7 +123,7 @@ with st.sidebar:
             "metric_cols": "Columns",
             "metric_file": "File",
             "subheader_sample": "Sample sentiment analysis",
-            "caption_sample": "Take the first N rows from the table, and call backend `analyze_review_text_as_dict` row-by-row for the selected text column. N is capped to keep latency/API quota under control.",
+            "caption_sample": "Take the first N rows from the table, and call backend for the selected text column concurrently using asyncio.",
             "selectbox_col": "Column containing review text",
             "slider_n": "Number of rows N (take first N)",
             "btn_start": "Start sample analysis",
@@ -238,20 +242,18 @@ with tab_batch:
             results_rows: list[dict] = []
             progress = st.progress(0.0, text=d["progress_preparing"])
 
-            # 循环调用后端 API 逐行分析
-            for i, (idx, raw) in enumerate(texts.items()):
-                # 设置当前进度条的显示文字
-                if lang == "zh":
-                    label = f"正在分析第 {i + 1}/{len(texts)} 条评论"
-                else:
-                    label = f"Analyzing Item {i + 1}/{len(texts)}"
-                progress.progress((i) / max(len(texts), 1), text=label)
+            async def process_item(i, idx, raw, sem):
+                async with sem:
+                    # 更新进度条文字
+                    if lang == "zh":
+                        label = f"正在分析第 {i + 1}/{len(texts)} 条评论"
+                    else:
+                        label = f"Analyzing Item {i + 1}/{len(texts)}"
+                    progress.progress((i) / max(len(texts), 1), text=label)
 
-                cell = raw
-                # 跳过空文本
-                if pd.isna(cell) or str(cell).strip() == "":
-                    results_rows.append(
-                        {
+                    cell = raw
+                    if pd.isna(cell) or str(cell).strip() == "":
+                        return {
                             d["col_index"]: idx,
                             d["col_excerpt"]: "",
                             "sentiment": "",
@@ -259,18 +261,15 @@ with tab_batch:
                             "summary_zh": d["summary_empty_skipped"],
                             "pain_points": "",
                         }
-                    )
-                    continue
 
-                text_full = str(cell).strip()
-                preview = text_full if len(text_full) <= 80 else text_full[:77] + "…"
+                    text_full = str(cell).strip()
+                    preview = text_full if len(text_full) <= 80 else text_full[:77] + "…"
 
-                try:
-                    # **核心：调用后端接入 Gemini 的函数**
-                    r = analyze_review_text_as_dict(text_full)
-                except genai_errors.ClientError as e:
-                    results_rows.append(
-                        {
+                    try:
+                        # **核心：调用异步后端接口**
+                        r = await async_analyze_review_text_as_dict(text_full)
+                    except genai_errors.ClientError as e:
+                        return {
                             d["col_index"]: idx,
                             d["col_excerpt"]: preview,
                             "sentiment": "",
@@ -278,10 +277,8 @@ with tab_batch:
                             "summary_zh": d["error_api"].format(e=e),
                             "pain_points": "",
                         }
-                    )
-                except (RuntimeError, ValueError) as e:
-                    results_rows.append(
-                        {
+                    except (RuntimeError, ValueError) as e:
+                        return {
                             d["col_index"]: idx,
                             d["col_excerpt"]: preview,
                             "sentiment": "",
@@ -289,12 +286,9 @@ with tab_batch:
                             "summary_zh": d["error_runtime"].format(e=e),
                             "pain_points": "",
                         }
-                    )
-                else:
-                    # 汇总后端返回的结构化 JSON 数据
-                    pp = r.get("pain_points") or []
-                    results_rows.append(
-                        {
+                    else:
+                        pp = r.get("pain_points") or []
+                        return {
                             d["col_index"]: idx,
                             d["col_excerpt"]: preview,
                             "sentiment": r.get("sentiment", ""),
@@ -302,7 +296,14 @@ with tab_batch:
                             "summary_zh": r.get("summary_zh", ""),
                             "pain_points": "；".join(pp) if isinstance(pp, list) else str(pp),
                         }
-                    )
+
+            async def run_batch():
+                sem = asyncio.Semaphore(5)  # 限制并发数为 5
+                tasks = [process_item(i, idx, raw, sem) for i, (idx, raw) in enumerate(texts.items())]
+                return await asyncio.gather(*tasks)
+
+            # 执行异步批量分析
+            results_rows = asyncio.run(run_batch())
 
             # 更新进度条完成状态
             progress.progress(1.0, text=d["progress_done"])
