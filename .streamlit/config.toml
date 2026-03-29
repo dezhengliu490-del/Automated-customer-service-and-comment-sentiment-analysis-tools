@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#FF4B4B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+[server]
+# 对于 Streamlit Cloud，默认配置性能较佳。此处可以添加某些特定设置（如有需要）。

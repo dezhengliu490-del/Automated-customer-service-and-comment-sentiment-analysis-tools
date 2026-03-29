@@ -1,6 +1,9 @@
-# 全栈依赖：后端（Gemini）+ 前端（Streamlit）
-# 安装：在项目根目录  python -m pip install -r requirements.txt
--r backend/requirements.txt
+# Streamlit Community Cloud 全栈依赖
+# 包含：前端 (Streamlit) + 后端 (Google Gemini API)
+
 streamlit>=1.28.0
 pandas>=2.0.0
-openpyxl>=3.1.0
+openpyxl>=3.1.0        # 用于读取 Excel 文件
+google-genai>=1.0.0    # 核心分析服务
+pydantic>=2.0.0        # 数据模型校验
+python-dotenv>=1.0.0   # 环境变量支持（本地）
