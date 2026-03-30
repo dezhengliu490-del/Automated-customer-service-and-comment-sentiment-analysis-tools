@@ -193,7 +193,7 @@ with tab_batch:
                 """)
                 st.rerun()
 
-        n_rows = st.slider(d["slider_n"], 1, min(100, len(df)), 5)
+        n_rows = st.number_input(d["slider_n"], min_value=1, max_value=max(1, len(df)), value=min(max(1, len(df)), 5), step=1)
 
         if st.button(d["btn_start"], type="primary"):
             sample = df.head(n_rows)
