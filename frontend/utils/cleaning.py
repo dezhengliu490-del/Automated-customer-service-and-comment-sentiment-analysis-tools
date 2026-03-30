@@ -34,12 +34,16 @@ def clean_review_dataframe(
     drop_duplicate_text: bool = True,
     drop_empty_text: bool = True,
     drop_full_row_duplicates: bool = False,
+    min_length: int = 1,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """
     对指定「评论文本」列做清洗，并可按文本列去重、删空行。
 
     返回：(清洗后的 DataFrame, 统计信息 dict)
     """
+    # 自动清理列名空格
+    df.columns = [c.strip() if isinstance(c, str) else c for c in df.columns]
+    
     if text_column not in df.columns:
         raise ValueError(f"列不存在: {text_column}")
 
@@ -48,22 +52,32 @@ def clean_review_dataframe(
         "dup_text_dropped": 0,
         "dup_row_dropped": 0,
         "empty_dropped": 0,
+        "too_short_dropped": 0,
         "rows_out": 0,
     }
 
     out = df.copy()
     out[text_column] = out[text_column].map(normalize_review_text)
 
+    # 1. 删空行
     if drop_empty_text:
         nonempty = out[text_column].str.len() > 0
         stats["empty_dropped"] = int((~nonempty).sum())
         out = out.loc[nonempty].reset_index(drop=True)
 
+    # 2. 长度过滤
+    if min_length > 1:
+        valid_len = out[text_column].str.len() >= min_length
+        stats["too_short_dropped"] = int((~valid_len).sum())
+        out = out.loc[valid_len].reset_index(drop=True)
+
+    # 3. 整行去重
     if drop_full_row_duplicates:
         before = len(out)
         out = out.drop_duplicates(keep="first").reset_index(drop=True)
         stats["dup_row_dropped"] = before - len(out)
 
+    # 4. 文本去重
     if drop_duplicate_text:
         before = len(out)
         out = out.drop_duplicates(subset=[text_column], keep="first").reset_index(drop=True)

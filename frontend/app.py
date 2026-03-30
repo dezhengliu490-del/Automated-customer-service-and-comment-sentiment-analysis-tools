@@ -71,6 +71,9 @@ with st.sidebar:
             "spinner_calling": "AI 正在分析中...",
             "error_runtime": "分析失败：{e}",
             "success_done": "分析已完成",
+            "btn_clean": "数据清洗",
+            "subheader_stats": "清洗结果报告",
+            "chart_title": "情感分布柱状图",
         },
         "en": {
             "sidebar_header": "Sentiment Analysis",
@@ -100,6 +103,9 @@ with st.sidebar:
             "spinner_calling": "AI analyzing...",
             "error_runtime": "Analysis failed: {e}",
             "success_done": "Completed",
+            "btn_clean": "Clean Data",
+            "subheader_stats": "Cleaning Stats",
+            "chart_title": "Sentiment Distribution",
         },
     }
     d = I18N[lang]
@@ -157,7 +163,37 @@ with tab_batch:
 
         st.subheader(d["subheader_sample"])
         col_text = st.selectbox(d["selectbox_col"], list(df.columns))
-        n_rows = st.slider(d["slider_n"], 1, min(50, len(df)), 5)
+
+        # --- 新增：数据清洗逻辑 ---
+        with st.expander(d["btn_clean"]):
+            c1, c2 = st.columns(2)
+            with c1:
+                do_dup_text = st.checkbox("去重 (Text)", value=True)
+                do_empty = st.checkbox("删空 (Empty)", value=True)
+            with c2:
+                do_dup_row = st.checkbox("整行去重 (Row)", value=False)
+                min_len = st.number_input("最小长度 (Min Len)", value=5, min_value=1)
+            
+            if st.button(d["btn_clean"], use_container_width=True):
+                cleaned_df, stats = clean_review_dataframe(
+                    df, col_text,
+                    drop_duplicate_text=do_dup_text,
+                    drop_empty_text=do_empty,
+                    drop_full_row_duplicates=do_dup_row,
+                    min_length=min_len
+                )
+                st.session_state[SS_DF] = cleaned_df
+                st.info(f"""
+                **{d['subheader_stats']}**
+                - {d['metric_rows']} IN: {stats['rows_in']}
+                - {d['metric_rows']} OUT: {stats['rows_out']}
+                - 空文字过滤: {stats['empty_dropped']}
+                - 长度过滤 (<{min_len}): {stats['too_short_dropped']}
+                - 文本去重: {stats['dup_text_dropped']}
+                """)
+                st.rerun()
+
+        n_rows = st.slider(d["slider_n"], 1, min(100, len(df)), 5)
 
         if st.button(d["btn_start"], type="primary"):
             sample = df.head(n_rows)
@@ -198,6 +234,27 @@ with tab_batch:
                 st.success(d["progress_done"])
                 res_df = pd.DataFrame(results)
                 st.dataframe(res_df, use_container_width=True)
+
+                # --- 新增：柱状图可视化 ---
+                if "sentiment" in res_df.columns:
+                    st.divider()
+                    st.subheader(d["chart_title"])
+                    
+                    # 统计频次
+                    sentiment_counts = res_df["sentiment"].value_counts().reset_index()
+                    sentiment_counts.columns = ["sentiment", "count"]
+                    
+                    # 使用 Altair 绘制美观柱状图
+                    chart = alt.Chart(sentiment_counts).mark_bar().encode(
+                        x=alt.X("sentiment:N", sort=["positive", "neutral", "negative"], title="Sentiment"),
+                        y=alt.Y("count:Q", title="Count"),
+                        color=alt.Color("sentiment:N", scale=alt.Scale(
+                            domain=["positive", "neutral", "negative"],
+                            range=["#2ecc71", "#f1c40f", "#e74c3c"]
+                        ))
+                    ).properties(height=400)
+                    
+                    st.altair_chart(chart, use_container_width=True)
 
 # 单条分析
 with tab_single:
