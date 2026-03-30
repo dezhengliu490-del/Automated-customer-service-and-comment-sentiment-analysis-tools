@@ -115,7 +115,7 @@ with st.sidebar:
     
     # --- 模型配置区 ---
     with st.expander(d["sidebar_config"], expanded=True):
-        p_choice = st.selectbox(d["config_provider"], ["Gemini", "DeepSeek"], index=0)
+        p_choice = st.selectbox(d["config_provider"], ["Gemini", "DeepSeek"], index=1)
         
         default_models = {
             "Gemini": "gemini-2.5-flash",

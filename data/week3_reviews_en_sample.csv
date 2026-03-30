@@ -1,0 +1,21 @@
+review_id,category,label_raw,review_text,source_file
+E0001,Hotel,0,"The hardware is okay, but service is terrible. Staff show no respect to guests. Check-in/out took forever. Disappointed.",week3_raw_reviews_1000_unprocessed.csv
+E0002,Shampoo,1,"Much cheaper than supermarket. Definitely my third purchase. Highly recommended.",week3_raw_reviews_1000_unprocessed.csv
+E0003,Phone,0,"Touch buttons are way too sensitive. Very frustrating to use.",week3_raw_reviews_1000_unprocessed.csv
+E0004,Fruit,1,"Great price, sweet and sour taste, very crispy. Good buy during promotion.",week3_raw_reviews_1000_unprocessed.csv
+E0005,Shampoo,1,"Looks good, haven't used yet. Always trust JD for my shopping.",week3_raw_reviews_1000_unprocessed.csv
+E0006,Fruit,1,"First time buying fruit online, surprisingly good. Will buy again.",week3_raw_reviews_1000_unprocessed.csv
+E0007,Book,1,"Rereading 'Win-Win' gives me a totally different perspective. Inspiring books on life and work attitudes.",week3_raw_reviews_1000_unprocessed.csv
+E0008,Hotel,0,"Forced to cancel existing order just to add a guarantee. Terrible customer experience!",week3_raw_reviews_1000_unprocessed.csv
+E0009,Clothes,1,"Quality is great, stylish design and comfortable fit. Good value for money.",week3_raw_reviews_1000_unprocessed.csv
+E0010,Fruit,1,"Packaging is good, actually better than expected for this low price.",week3_raw_reviews_1000_unprocessed.csv
+E0011,Tablet,1,"Good quality. Just as I imagined. A satisfying shopping experience.",week3_raw_reviews_1000_unprocessed.csv
+E0012,Fruit,0,"All rotten! Better buy at a physical store. Online isn't that much cheaper anyway.",week3_raw_reviews_1000_unprocessed.csv
+E0013,Tablet,0,"Still have the same issue after factory reset. Keeps popping up errors.",week3_raw_reviews_1000_unprocessed.csv
+E0014,Tablet,1,"Really good, this tablet works perfectly for my needs.",week3_raw_reviews_1000_unprocessed.csv
+E0015,Fruit,1,"Apples are great, bought them for my son. Fast logistics too!",week3_raw_reviews_1000_unprocessed.csv
+E0016,Hotel,0,"Average environment, cold service. Close to airport but not much else.",week3_raw_reviews_1000_unprocessed.csv
+E0017,Computer,0,"Only one partition (C drive) and no CD-ROM. Backup system is a pain.",week3_raw_reviews_1000_unprocessed.csv
+E0018,Shampoo,0,"Terrible! Causes dandruff after washing. Doubt it's authentic. One star.",week3_raw_reviews_1000_unprocessed.csv
+E0019,Hotel,1,"Service quality is decent despite some new staff. Good experience overall.",week3_raw_reviews_1000_unprocessed.csv
+E0020,Shampoo,0,"Got dandruff right after using this. I need an explanation from the seller!",week3_raw_reviews_1000_unprocessed.csv
