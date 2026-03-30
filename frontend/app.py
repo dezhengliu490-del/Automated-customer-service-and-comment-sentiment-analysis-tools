@@ -1,5 +1,5 @@
 """
-第三周前端（Streamlit）：提供数据上传、预览、抽样情感分析及单条分析功能。
+第三周前端（Streamlit）：提供数据上传、预览、批量分析及单条分析功能。
 支持多模型切换（配置于 .env 文件中）。
 """
 
@@ -58,9 +58,9 @@ with st.sidebar:
             "subheader_preview": "数据预览",
             "metric_rows": "总行数",
             "metric_cols": "总列数",
-            "subheader_sample": "抽样分析",
+            "subheader_sample": "分析",
             "selectbox_col": "请选择内容列",
-            "slider_n": "抽样数量 N",
+            "slider_n": "分析数量 N",
             "btn_start": "开始分析",
             "progress_preparing": "准备中...",
             "progress_done": "分析完成",
@@ -90,9 +90,9 @@ with st.sidebar:
             "subheader_preview": "Preview",
             "metric_rows": "Rows",
             "metric_cols": "Cols",
-            "subheader_sample": "Sample Analysis",
+            "subheader_sample": "Analysis",
             "selectbox_col": "Select Column",
-            "slider_n": "Sample size N",
+            "slider_n": "Analysis Count N",
             "btn_start": "Run Analysis",
             "progress_preparing": "Preparing...",
             "progress_done": "Done",
