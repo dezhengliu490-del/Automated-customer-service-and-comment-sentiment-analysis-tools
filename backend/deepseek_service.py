@@ -11,6 +11,7 @@ from openai import OpenAI, AsyncOpenAI
 from llm_base import LLMService
 from prompts import SYSTEM_INSTRUCTION, build_user_prompt
 from config import get_deepseek_api_key
+from schemas import SentimentAnalysisResult
 
 class DeepSeekService(LLMService):
     """
