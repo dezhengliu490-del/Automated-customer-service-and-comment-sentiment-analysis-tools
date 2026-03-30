@@ -32,3 +32,10 @@ def get_gemini_model() -> str:
     从环境变量获取 Gemini 模型名称，默认为 'gemini-2.0-flash'。
     """
     return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+
+
+def get_llm_provider() -> str:
+    """
+    从环境变量获取当前的 LLM 提供商。
+    """
+    return os.environ.get("LLM_PROVIDER", "gemini").lower().strip()

@@ -1,31 +1,19 @@
 """
-第三周后端入口：单条文本输入 -> Gemini -> 结构化 JSON 输出。
+后端入口：单条文本输入 -> LLM Factory -> 结构化 JSON 输出。
 
-安装依赖（在 backend 目录）:
-  pip install -r requirements.txt
-
-测试 main（会调用 Gemini API；密钥需放在 backend/.env 或环境变量 GEMINI_API_KEY 中）:
-
-  在项目根目录（已激活 .venv 时）:
-    python backend/main.py "这条评论质量不错，就是物流有点慢"
-
-  或在 backend 目录:
-    python main.py "这条评论质量不错，就是物流有点慢"
-
-  从文件读入:
-    python main.py --file sample_review.txt
+支持多种大模型提供商，通过修改 .env 中的 LLM_PROVIDER 切换。
+现在模型调用已抽象化为 LLMService 接口。
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import json
 from pathlib import Path
 
-from google.genai import errors as genai_errors
-
-from gemini_service import analyze_review_text_json_string
-
+from llm_factory import get_llm_service
+from config import get_llm_provider
 
 def _read_text(args: argparse.Namespace) -> str:
     """根据参数从文件、参数或标准输入读取文本。"""
@@ -41,8 +29,9 @@ def _read_text(args: argparse.Namespace) -> str:
 
 def main() -> None:
     """解析命令行参数并执行分析任务。"""
+    provider = get_llm_provider()
     parser = argparse.ArgumentParser(
-        description="通过 Gemini API 分析单条评论；并打印结构化 JSON 结果。"
+        description=f"通过 {provider.upper()} API 分析单条评论；并打印结构化 JSON 结果。"
     )
     parser.add_argument(
         "text",
@@ -67,14 +56,19 @@ def main() -> None:
         raise SystemExit("无输入文本：请传入字符串、使用 --file 或管道输入。")
 
     try:
-        # 执行分析并获取 JSON 字符串
-        out = analyze_review_text_json_string(body)
-    except genai_errors.ClientError as e:
-        raise SystemExit(f"Gemini API 错误: {e}") from e
-    except RuntimeError as e:
-        raise SystemExit(str(e)) from e
-    except ValueError as e:
-        raise SystemExit(str(e)) from e
+        # 1. 获取 LLM 服务实例
+        service = get_llm_service()
+        
+        # 2. 执行分析并获取字典结果
+        result_dict = service.analyze_review_as_dict(body)
+        
+        # 3. 转换为格式化的 JSON 字符串
+        out = json.dumps(result_dict, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        # 通用错误处理，根据需要可以细化
+        error_type = type(e).__name__
+        raise SystemExit(f"[{provider.upper()} 错误] {error_type}: {e}") from e
 
     # 打印最终结果
     print(out)

@@ -8,3 +8,5 @@ altair>=5.0.0          # 图表（情感分布等）
 google-genai>=1.0.0    # 核心分析服务
 pydantic>=2.0.0        # 数据模型校验
 python-dotenv>=1.0.0   # 环境变量支持（本地）
+openai>=1.0.0          # OpenAI & DeepSeek 兼容接口支持
+httpx>=0.25.0          # 异步 HTTP 请求支持
