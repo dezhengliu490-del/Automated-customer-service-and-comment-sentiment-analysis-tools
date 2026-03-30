@@ -245,8 +245,11 @@ with tab_batch:
                     sentiment_counts.columns = ["sentiment", "count"]
                     
                     # 使用 Altair 绘制美观柱状图
-                    chart = alt.Chart(sentiment_counts).mark_bar().encode(
-                        x=alt.X("sentiment:N", sort=["positive", "neutral", "negative"], title="Sentiment"),
+                    chart = alt.Chart(sentiment_counts).mark_bar(size=40).encode(
+                        x=alt.X("sentiment:N", 
+                                sort=["positive", "neutral", "negative"], 
+                                title="Sentiment",
+                                axis=alt.Axis(labelAngle=0)),
                         y=alt.Y("count:Q", title="Count"),
                         color=alt.Color("sentiment:N", scale=alt.Scale(
                             domain=["positive", "neutral", "negative"],
