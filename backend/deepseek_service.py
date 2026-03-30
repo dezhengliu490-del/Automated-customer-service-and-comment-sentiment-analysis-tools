@@ -33,7 +33,7 @@ class DeepSeekService(LLMService):
 
     def _check_client(self):
         if not self._client:
-            raise ValueError("DeepSeek API Key 未配置，请在前端配置或 .env 中设置。")
+            raise ValueError("DeepSeek API Key 未配置，请通过环境变量或 .env 设置。")
 
     def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
         self._check_client()
@@ -42,7 +42,7 @@ class DeepSeekService(LLMService):
 
         user_prompt = build_user_prompt(review_text)
         
-        # 针对不原生支持 schema 的模型，在系统提示词中强化 JSON 要求
+        # 强制要求 JSON 格式
         json_instruction = (
             "\n\n请严格按以下 JSON 格式输出，不要包含任何 markdown 代码块标记：\n"
             + json.dumps(SentimentAnalysisResult.model_json_schema(), ensure_ascii=False)
