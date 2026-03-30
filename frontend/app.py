@@ -175,16 +175,21 @@ with tab_batch:
                     st.error(f"Failed to init LLM: {e}")
                     return []
                 
+                finished_count = 0
                 tasks = []
                 for i, (idx, raw) in enumerate(texts.items()):
-                    async def one_call(t, pos):
+                    async def one_call(t, current_idx=idx):
+                        nonlocal finished_count
                         try:
                             res = await service.async_analyze_review_as_dict(str(t))
-                            progress.progress((pos + 1) / n_rows, text=f"Analyzing {pos+1}/{n_rows}")
-                            return {"index": idx, "text": str(t)[:50]+"...", **res}
+                            finished_count += 1
+                            progress.progress(finished_count / n_rows, text=f"Analyzing {finished_count}/{n_rows}")
+                            return {"index": current_idx, "text": str(t)[:50]+"...", **res}
                         except Exception as e:
-                            return {"index": idx, "text": str(t)[:50]+"...", "error": str(e)}
-                    tasks.append(one_call(raw, i))
+                            finished_count += 1
+                            progress.progress(finished_count / n_rows, text=f"Analyzing {finished_count}/{n_rows}")
+                            return {"index": current_idx, "text": str(t)[:50]+"...", "error": str(e)}
+                    tasks.append(one_call(raw))
                 
                 return await asyncio.gather(*tasks)
 
