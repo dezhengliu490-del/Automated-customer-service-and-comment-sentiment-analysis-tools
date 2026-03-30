@@ -44,12 +44,12 @@ with st.sidebar:
     # 多语言文案
     I18N = {
         "zh": {
-            "sidebar_header": "第三周 · 前端",
+            "sidebar_header": "评论分析系统",
             "sidebar_config": "模型配置 (LLM Config)",
             "config_provider": "提供商 (Provider)",
             "config_model": "模型型号 (Model)",
             "page_title": "多模型评论情感分析系统",
-            "page_subtitle": "**Week 3**：基于 .env 配置的自动化分析系统。",
+            "page_subtitle": "基于大语言模型（LLM）的评论内容自动化情感分析与汇总。",
             "tab_batch": "批量分析",
             "tab_single": "单条评论",
             "expander_upload": "① 上传文件",
@@ -73,12 +73,12 @@ with st.sidebar:
             "success_done": "分析已完成",
         },
         "en": {
-            "sidebar_header": "Week 3 · Frontend",
+            "sidebar_header": "Sentiment Analysis",
             "sidebar_config": "LLM Config",
             "config_provider": "Provider",
             "config_model": "Model",
             "page_title": "Multi-LLM Sentiment Analysis",
-            "page_subtitle": "**Week 3**: Automated analysis system using .env config.",
+            "page_subtitle": "Automated review analysis dashboard powered by Large Language Models.",
             "tab_batch": "Batch Analysis",
             "tab_single": "Single Review",
             "expander_upload": "① Upload file",
