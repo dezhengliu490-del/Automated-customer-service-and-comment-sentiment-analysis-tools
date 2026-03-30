@@ -149,7 +149,7 @@ with st.sidebar:
         
         # 默认模型型号
         default_models = {
-            "Gemini": "gemini-2.0-flash",
+            "Gemini": "gemini-2.5-flash",
             "DeepSeek": "deepseek-chat"
         }
         
