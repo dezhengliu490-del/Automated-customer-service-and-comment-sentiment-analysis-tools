@@ -10,7 +10,7 @@ from openai import OpenAI, AsyncOpenAI
 
 from llm_base import LLMService
 from prompts import SYSTEM_INSTRUCTION, build_user_prompt
-from schemas import SentimentAnalysisResult
+from config import get_deepseek_api_key
 
 class DeepSeekService(LLMService):
     """
@@ -18,7 +18,7 @@ class DeepSeekService(LLMService):
     """
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key or get_deepseek_api_key()
         self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
         self.base_url = "https://api.deepseek.com"
         

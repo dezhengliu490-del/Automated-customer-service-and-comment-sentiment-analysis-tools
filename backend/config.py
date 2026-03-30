@@ -27,6 +27,19 @@ def get_gemini_api_key() -> str:
     return key.strip()
 
 
+def get_deepseek_api_key() -> str:
+    """
+    从环境变量或 .env 文件中获取 DeepSeek API 密钥。
+    """
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key or not key.strip():
+        raise RuntimeError(
+            "缺少 DeepSeek API 密钥：请在环境变量中设置 DEEPSEEK_API_KEY，"
+            "或者在 backend/.env 文件中配置。"
+        )
+    return key.strip()
+
+
 def get_gemini_model() -> str:
     """
     从环境变量获取 Gemini 模型名称，默认为 'gemini-2.5-flash'。
