@@ -61,7 +61,7 @@ class DeepSeekService(LLMService):
                 "role": "system",
                 "content": build_system_instruction(summary_language) + self._json_instruction(),
             },
-            {"role": "user", "content": build_user_prompt(text)},
+            {"role": "user", "content": build_user_prompt(text, summary_language=summary_language)},
         ]
 
     def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:

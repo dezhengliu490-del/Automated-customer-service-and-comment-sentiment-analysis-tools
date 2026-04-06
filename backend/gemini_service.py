@@ -56,7 +56,7 @@ class GeminiService(LLMService):
     def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
         lang = normalize_summary_language(summary_language)
-        user_prompt = build_user_prompt(text)
+        user_prompt = build_user_prompt(text, summary_language=lang)
         started = time.perf_counter()
         attempts = 1
         try:
@@ -110,7 +110,7 @@ class GeminiService(LLMService):
     ) -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
         lang = normalize_summary_language(summary_language)
-        user_prompt = build_user_prompt(text)
+        user_prompt = build_user_prompt(text, summary_language=lang)
         started = time.perf_counter()
         attempts = 1
         try:
