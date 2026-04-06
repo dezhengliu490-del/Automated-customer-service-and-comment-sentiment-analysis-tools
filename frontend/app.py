@@ -29,17 +29,75 @@ SS_BATCH_RUNNING = "batch_running"
 SS_BATCH_TEXT_COL = "batch_text_col"
 
 
+def _detect_review_column(df: pd.DataFrame) -> str | None:
+    if df is None or df.empty:
+        return None
+
+    columns = list(df.columns)
+    if not columns:
+        return None
+
+    # 1) Name-based priority
+    strong_tokens = [
+        "review_text",
+        "review",
+        "comment",
+        "comments",
+        "文本",
+        "评论",
+        "内容",
+        "评价",
+    ]
+    for col in columns:
+        name = str(col).strip().lower()
+        if any(token in name for token in strong_tokens):
+            return col
+
+    # 2) Content-based fallback
+    best_col = None
+    best_score = -1.0
+    for col in columns:
+        s = df[col]
+        if not (
+            pd.api.types.is_object_dtype(s)
+            or pd.api.types.is_string_dtype(s)
+            or pd.api.types.is_categorical_dtype(s)
+        ):
+            continue
+
+        sample = s.dropna().astype("string").str.strip().head(200)
+        if sample.empty:
+            continue
+        non_empty_ratio = (sample.str.len() > 0).mean()
+        avg_len = sample.str.len().mean()
+        unique_ratio = sample.nunique() / max(len(sample), 1)
+        score = non_empty_ratio * 0.5 + min(avg_len / 60.0, 1.0) * 0.3 + unique_ratio * 0.2
+        if score > best_score:
+            best_score = score
+            best_col = col
+
+    return best_col
+
+
 def _find_time_columns(df: pd.DataFrame) -> list[str]:
     candidates: list[str] = []
     for col in df.columns:
         s = df[col]
+        col_name = str(col).strip().lower()
+        name_hint = any(token in col_name for token in ["time", "date", "日期", "时间"])
         if pd.api.types.is_datetime64_any_dtype(s):
             candidates.append(col)
             continue
-        if pd.api.types.is_object_dtype(s):
-            parsed = pd.to_datetime(s, errors="coerce")
-            # 仅当可解析比例较高时，认为是时间列
-            if len(parsed) > 0 and parsed.notna().mean() >= 0.7:
+        if (
+            pd.api.types.is_object_dtype(s)
+            or pd.api.types.is_string_dtype(s)
+            or pd.api.types.is_categorical_dtype(s)
+        ):
+            cleaned = s.astype("string").str.strip()
+            parsed = pd.to_datetime(cleaned, errors="coerce")
+            # 列名命中时间关键词时，降低识别阈值；否则保持较高阈值
+            threshold = 0.4 if name_hint else 0.7
+            if len(parsed) > 0 and parsed.notna().mean() >= threshold:
                 candidates.append(col)
     return candidates
 
@@ -199,6 +257,8 @@ with st.sidebar:
             "metric_cols": "总列数",
             "subheader_sample": "分析",
             "selectbox_col": "请选择内容列",
+            "auto_col_hint": "已自动识别评论列：`{col}`。如不准确可手动调整。",
+            "manual_col": "手动选择评论列",
             "slider_n": "分析数量 N",
             "btn_start": "开始分析",
             "progress_preparing": "准备中...",
@@ -239,6 +299,8 @@ with st.sidebar:
             "metric_cols": "Cols",
             "subheader_sample": "Analysis",
             "selectbox_col": "Select Column",
+            "auto_col_hint": "Auto-detected review column: `{col}`. You can switch manually if needed.",
+            "manual_col": "Pick column manually",
             "slider_n": "Analysis Count N",
             "btn_start": "Run Analysis",
             "progress_preparing": "Preparing...",
@@ -313,7 +375,13 @@ with tab_batch:
         st.dataframe(df.head(100), use_container_width=True)
 
         st.subheader(d["subheader_sample"])
-        col_text = st.selectbox(d["selectbox_col"], list(df.columns), key="select_col_text")
+        auto_col = _detect_review_column(df)
+        all_cols = list(df.columns)
+        default_idx = all_cols.index(auto_col) if auto_col in all_cols else 0
+        col_text = all_cols[default_idx]
+        st.caption(d["auto_col_hint"].format(col=col_text))
+        if st.checkbox(d["manual_col"], value=False, key="manual_col_toggle"):
+            col_text = st.selectbox(d["selectbox_col"], all_cols, index=default_idx, key="select_col_text")
 
         with st.expander(d["btn_clean"]):
             c1, c2 = st.columns(2)
