@@ -11,28 +11,32 @@ class LLMService(ABC):
     """
 
     @abstractmethod
-    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         """
         同步文本分析。
         """
         pass
 
     @abstractmethod
-    def analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
+    def analyze_review_as_dict(self, review_text: str, summary_language: str = "zh") -> dict[str, Any]:
         """
         同步文本分析，返回字典格式。
         """
         pass
 
     @abstractmethod
-    async def async_analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    async def async_analyze_review(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> SentimentAnalysisResult:
         """
         异步文本分析。
         """
         pass
 
     @abstractmethod
-    async def async_analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
+    async def async_analyze_review_as_dict(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> dict[str, Any]:
         """
         异步文本分析，返回字典格式。
         """

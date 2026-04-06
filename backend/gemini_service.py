@@ -19,7 +19,7 @@ from config import (
 )
 from llm_base import LLMService
 from observability import log_llm_call
-from prompts import SYSTEM_INSTRUCTION, build_user_prompt
+from prompts import build_system_instruction, build_user_prompt, normalize_summary_language
 from resilience import RetryConfig, TokenBucketRateLimiter, call_with_timeout, run_with_retry, run_with_retry_async
 from schemas import SentimentAnalysisResult
 
@@ -46,15 +46,16 @@ class GeminiService(LLMService):
             raise ValueError("review text cannot be empty")
         return text
 
-    def _build_config(self) -> types.GenerateContentConfig:
+    def _build_config(self, summary_language: str) -> types.GenerateContentConfig:
         return types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
+            system_instruction=build_system_instruction(summary_language),
             response_mime_type="application/json",
             response_json_schema=SentimentAnalysisResult.model_json_schema(),
         )
 
-    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        lang = normalize_summary_language(summary_language)
         user_prompt = build_user_prompt(text)
         started = time.perf_counter()
         attempts = 1
@@ -66,7 +67,7 @@ class GeminiService(LLMService):
                         lambda: self._client.models.generate_content(
                             model=self.model,
                             contents=user_prompt,
-                            config=self._build_config(),
+                            config=self._build_config(lang),
                         ),
                         timeout_seconds=self.timeout_seconds,
                     ),
@@ -101,18 +102,21 @@ class GeminiService(LLMService):
             )
             raise
 
-    def analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
-        return self.analyze_review(review_text).model_dump()
+    def analyze_review_as_dict(self, review_text: str, summary_language: str = "zh") -> dict[str, Any]:
+        return self.analyze_review(review_text, summary_language=summary_language).model_dump()
 
-    async def async_analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    async def async_analyze_review(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        lang = normalize_summary_language(summary_language)
         user_prompt = build_user_prompt(text)
         started = time.perf_counter()
         attempts = 1
         try:
             async with self._semaphore:
                 response, attempts = await run_with_retry_async(
-                    lambda: self._async_call_once(user_prompt),
+                    lambda: self._async_call_once(user_prompt, lang),
                     retry_config=self.retry_config,
                 )
             body = response.text
@@ -143,33 +147,35 @@ class GeminiService(LLMService):
             )
             raise
 
-    async def _async_call_once(self, user_prompt: str):
+    async def _async_call_once(self, user_prompt: str, summary_language: str):
         await self._rate_limiter.acquire_async()
         return await asyncio.wait_for(
             self._client.aio.models.generate_content(
                 model=self.model,
                 contents=user_prompt,
-                config=self._build_config(),
+                config=self._build_config(summary_language),
             ),
             timeout=self.timeout_seconds,
         )
 
-    async def async_analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
-        result = await self.async_analyze_review(review_text)
+    async def async_analyze_review_as_dict(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> dict[str, Any]:
+        result = await self.async_analyze_review(review_text, summary_language=summary_language)
         return result.model_dump()
 
 
-def analyze_review_text(review_text: str) -> SentimentAnalysisResult:
-    return GeminiService().analyze_review(review_text)
+def analyze_review_text(review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
+    return GeminiService().analyze_review(review_text, summary_language=summary_language)
 
 
-def analyze_review_text_as_dict(review_text: str) -> dict[str, Any]:
-    return GeminiService().analyze_review_as_dict(review_text)
+def analyze_review_text_as_dict(review_text: str, summary_language: str = "zh") -> dict[str, Any]:
+    return GeminiService().analyze_review_as_dict(review_text, summary_language=summary_language)
 
 
-async def async_analyze_review_text(review_text: str) -> SentimentAnalysisResult:
-    return await GeminiService().async_analyze_review(review_text)
+async def async_analyze_review_text(review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
+    return await GeminiService().async_analyze_review(review_text, summary_language=summary_language)
 
 
-async def async_analyze_review_text_as_dict(review_text: str) -> dict[str, Any]:
-    return await GeminiService().async_analyze_review_as_dict(review_text)
+async def async_analyze_review_text_as_dict(review_text: str, summary_language: str = "zh") -> dict[str, Any]:
+    return await GeminiService().async_analyze_review_as_dict(review_text, summary_language=summary_language)

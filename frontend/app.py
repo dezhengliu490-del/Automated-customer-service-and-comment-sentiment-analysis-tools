@@ -37,20 +37,30 @@ def _detect_review_column(df: pd.DataFrame) -> str | None:
     if not columns:
         return None
 
-    # 1) Name-based priority
-    strong_tokens = [
+    # 1) Name-based priority (strict -> fuzzy), explicitly exclude id-like columns
+    names = {col: str(col).strip().lower() for col in columns}
+    exclude_tokens = ["_id", "id_", " id", "编号", "序号", "index", "索引"]
+
+    exact_priority = [
         "review_text",
-        "review",
-        "comment",
-        "comments",
-        "文本",
-        "评论",
+        "reviewtext",
+        "comment_text",
+        "comments_text",
+        "评论内容",
+        "评价内容",
+        "评论文本",
         "内容",
-        "评价",
     ]
-    for col in columns:
-        name = str(col).strip().lower()
-        if any(token in name for token in strong_tokens):
+    for key in exact_priority:
+        for col, name in names.items():
+            if name == key:
+                return col
+
+    fuzzy_priority = ["review_text", "comment_text", "评论", "评价", "内容", "text", "comment", "review"]
+    for col, name in names.items():
+        if any(tok in name for tok in exclude_tokens):
+            continue
+        if any(token in name for token in fuzzy_priority):
             return col
 
     # 2) Content-based fallback
@@ -65,13 +75,16 @@ def _detect_review_column(df: pd.DataFrame) -> str | None:
         ):
             continue
 
+        name = str(col).strip().lower()
         sample = s.dropna().astype("string").str.strip().head(200)
         if sample.empty:
             continue
         non_empty_ratio = (sample.str.len() > 0).mean()
         avg_len = sample.str.len().mean()
         unique_ratio = sample.nunique() / max(len(sample), 1)
-        score = non_empty_ratio * 0.5 + min(avg_len / 60.0, 1.0) * 0.3 + unique_ratio * 0.2
+        score = non_empty_ratio * 0.45 + min(avg_len / 60.0, 1.0) * 0.35 + unique_ratio * 0.2
+        if any(tok in name for tok in exclude_tokens):
+            score -= 0.7
         if score > best_score:
             best_score = score
             best_col = col
@@ -192,6 +205,7 @@ def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n
 async def _run_batch_analysis(
     service,
     rows: list[tuple[int, str]],
+    summary_language: str,
     progress,
     progress_text,
     status_placeholder,
@@ -203,7 +217,10 @@ async def _run_batch_analysis(
     async def one_call(current_idx: int, raw_text: str) -> dict:
         nonlocal finished_count, failed_count
         try:
-            res = await service.async_analyze_review_as_dict(str(raw_text))
+            res = await service.async_analyze_review_as_dict(
+                str(raw_text),
+                summary_language=summary_language,
+            )
             return {
                 "index": current_idx,
                 "preview": str(raw_text)[:80] + ("..." if len(str(raw_text)) > 80 else ""),
@@ -245,6 +262,7 @@ with st.sidebar:
             "sidebar_config": "模型配置 (LLM Config)",
             "config_provider": "提供商 (Provider)",
             "config_model": "模型型号 (Model)",
+            "config_summary_lang": "摘要语言 (Summary)",
             "page_title": "多模型评论情感分析系统",
             "page_subtitle": "基于大语言模型（LLM）的评论内容自动化情感分析与汇总。",
             "tab_batch": "批量分析",
@@ -281,12 +299,15 @@ with st.sidebar:
             "failed_retry": "重试失败项",
             "failed_none": "当前批次无失败项。",
             "running_tip": "任务执行中，请勿重复提交。",
+            "lang_zh": "中文",
+            "lang_en": "English",
         },
         "en": {
             "sidebar_header": "Sentiment Analysis",
             "sidebar_config": "LLM Config",
             "config_provider": "Provider",
             "config_model": "Model",
+            "config_summary_lang": "Summary Language",
             "page_title": "Multi-LLM Sentiment Analysis",
             "page_subtitle": "Automated review analysis dashboard powered by Large Language Models.",
             "tab_batch": "Batch Analysis",
@@ -323,6 +344,8 @@ with st.sidebar:
             "failed_retry": "Retry Failed Items",
             "failed_none": "No failed items in this batch.",
             "running_tip": "A batch is running. Please avoid duplicate submissions.",
+            "lang_zh": "Chinese",
+            "lang_en": "English",
         },
     }
     d = I18N[lang]
@@ -334,8 +357,15 @@ with st.sidebar:
         p_choice = st.selectbox(d["config_provider"], ["Gemini", "DeepSeek"], index=1)
         default_models = {"Gemini": "gemini-2.5-flash", "DeepSeek": "deepseek-chat"}
         selected_model = st.text_input(d["config_model"], value=default_models.get(p_choice, ""))
+        summary_lang_label = st.selectbox(
+            d["config_summary_lang"],
+            options=[d["lang_zh"], d["lang_en"]],
+            index=0,
+        )
+        summary_lang = "zh" if summary_lang_label == d["lang_zh"] else "en"
         st.session_state["llm_provider"] = p_choice.lower()
         st.session_state["llm_model"] = selected_model
+        st.session_state["summary_language"] = summary_lang
 
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
@@ -441,6 +471,7 @@ with tab_batch:
                     _run_batch_analysis(
                         service,
                         rows,
+                        st.session_state.get("summary_language", "zh"),
                         progress,
                         progress_text="Analyzing",
                         status_placeholder=status_placeholder,
@@ -485,6 +516,7 @@ with tab_batch:
                             _run_batch_analysis(
                                 service,
                                 retry_rows,
+                                st.session_state.get("summary_language", "zh"),
                                 progress,
                                 progress_text="Retrying",
                                 status_placeholder=status_placeholder,
@@ -526,7 +558,10 @@ with tab_single:
                         provider=st.session_state.llm_provider,
                         model=st.session_state.llm_model,
                     )
-                    res = service.analyze_review_as_dict(text_input.strip())
+                    res = service.analyze_review_as_dict(
+                        text_input.strip(),
+                        summary_language=st.session_state.get("summary_language", "zh"),
+                    )
                     st.success(d["success_done"])
                     st.json(res)
                 except Exception as exc:

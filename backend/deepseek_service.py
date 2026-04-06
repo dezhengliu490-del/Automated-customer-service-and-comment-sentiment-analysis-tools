@@ -19,7 +19,7 @@ from config import (
 )
 from llm_base import LLMService
 from observability import log_llm_call
-from prompts import SYSTEM_INSTRUCTION, build_user_prompt
+from prompts import build_system_instruction, build_user_prompt, normalize_summary_language
 from resilience import RetryConfig, TokenBucketRateLimiter, run_with_retry, run_with_retry_async
 from schemas import SentimentAnalysisResult
 
@@ -55,15 +55,19 @@ class DeepSeekService(LLMService):
             + json.dumps(SentimentAnalysisResult.model_json_schema(), ensure_ascii=False)
         )
 
-    def _messages(self, text: str) -> list[dict[str, str]]:
+    def _messages(self, text: str, summary_language: str) -> list[dict[str, str]]:
         return [
-            {"role": "system", "content": SYSTEM_INSTRUCTION + self._json_instruction()},
+            {
+                "role": "system",
+                "content": build_system_instruction(summary_language) + self._json_instruction(),
+            },
             {"role": "user", "content": build_user_prompt(text)},
         ]
 
-    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
-        messages = self._messages(text)
+        lang = normalize_summary_language(summary_language)
+        messages = self._messages(text, lang)
         started = time.perf_counter()
         attempts = 1
         try:
@@ -109,12 +113,15 @@ class DeepSeekService(LLMService):
             timeout=self.timeout_seconds,
         )
 
-    def analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
-        return self.analyze_review(review_text).model_dump()
+    def analyze_review_as_dict(self, review_text: str, summary_language: str = "zh") -> dict[str, Any]:
+        return self.analyze_review(review_text, summary_language=summary_language).model_dump()
 
-    async def async_analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    async def async_analyze_review(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
-        messages = self._messages(text)
+        lang = normalize_summary_language(summary_language)
+        messages = self._messages(text, lang)
         started = time.perf_counter()
         attempts = 1
         try:
@@ -161,6 +168,8 @@ class DeepSeekService(LLMService):
             timeout=self.timeout_seconds,
         )
 
-    async def async_analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
-        result = await self.async_analyze_review(review_text)
+    async def async_analyze_review_as_dict(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> dict[str, Any]:
+        result = await self.async_analyze_review(review_text, summary_language=summary_language)
         return result.model_dump()

@@ -18,16 +18,20 @@ class OpenAIService(LLMService):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model or os.getenv("OPENAI_MODEL")
 
-    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         # TODO: 使用 openai 库实现逻辑
         raise NotImplementedError("OpenAIService.analyze_review 尚未完全实现。")
 
-    def analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
+    def analyze_review_as_dict(self, review_text: str, summary_language: str = "zh") -> dict[str, Any]:
         raise NotImplementedError("OpenAIService.analyze_review_as_dict 尚未实现。")
 
-    async def async_analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+    async def async_analyze_review(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> SentimentAnalysisResult:
         # TODO: 使用 openai 异步库实现逻辑
         raise NotImplementedError("OpenAIService.async_analyze_review 尚未实现。")
 
-    async def async_analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
+    async def async_analyze_review_as_dict(
+        self, review_text: str, summary_language: str = "zh"
+    ) -> dict[str, Any]:
         raise NotImplementedError("OpenAIService.async_analyze_review_as_dict 尚未实现。")
