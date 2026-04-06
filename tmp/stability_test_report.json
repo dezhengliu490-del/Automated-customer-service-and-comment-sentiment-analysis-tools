@@ -1,0 +1,41 @@
+{
+  "single": {
+    "ok": false,
+    "error": "ConnectError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"
+  },
+  "timeout_test": {
+    "ok": false,
+    "error": "APITimeoutError: Request timed out."
+  },
+  "batch_50": {
+    "completed": 50,
+    "ok": 0,
+    "error": 50,
+    "sample_error": "APITimeoutError: Request timed out."
+  },
+  "log_check": {
+    "new_entries": 52,
+    "fields_presence": {
+      "status": true,
+      "latency_ms": true,
+      "attempts": true,
+      "error_type": true
+    },
+    "status_counts": {
+      "error": 52
+    },
+    "max_attempts": 1,
+    "sample": {
+      "ts": "2026-04-06T13:58:10.083968+00:00",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "operation": "async_analyze_review",
+      "status": "error",
+      "latency_ms": 54653,
+      "attempts": 1,
+      "text_length": 82,
+      "error_type": "APITimeoutError",
+      "error_message": "Request timed out."
+    }
+  }
+}
