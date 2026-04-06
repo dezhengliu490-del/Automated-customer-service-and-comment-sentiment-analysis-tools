@@ -20,7 +20,7 @@ def build_system_instruction(summary_language: str = "zh") -> str:
             "For one review, return strict structured output with: "
             "1) sentiment (positive/neutral/negative), "
             "2) confidence between 0 and 1, "
-            "3) pain_points as concise phrases, "
+            "3) pain_points as concise ENGLISH phrases, "
             "4) summary_zh field MUST be written in English (1-2 sentences). "
             "Do not fabricate facts."
         )
@@ -29,7 +29,7 @@ def build_system_instruction(summary_language: str = "zh") -> str:
         "你是电商评论分析助手。对于一条评论，请结构化输出："
         "1）sentiment（positive/neutral/negative），"
         "2）0到1之间的confidence，"
-        "3）pain_points（简短短语，无则空列表），"
+        "3）pain_points（中文简短短语，无则空列表），"
         "4）summary_zh字段必须用中文写1-2句摘要。"
         "不要编造事实。"
     )
@@ -44,10 +44,14 @@ def build_user_prompt(review_text: str, summary_language: str = "zh") -> str:
     if lang == "en":
         return (
             "Analyze the following user review and return the required structured result. "
-            "Important: summary_zh must be in English.\n\n"
+            "Important: summary_zh must be in English, and pain_points must also be in English.\n\n"
             f"{text}"
         )
-    return f"以下是一条用户评论，请按要求输出结构化结果：\n\n{text}"
+    return (
+        "以下是一条用户评论，请按要求输出结构化结果。"
+        "注意：summary_zh和pain_points都请使用中文。\n\n"
+        f"{text}"
+    )
 
 
 REPLY_SYSTEM_INSTRUCTION = (
