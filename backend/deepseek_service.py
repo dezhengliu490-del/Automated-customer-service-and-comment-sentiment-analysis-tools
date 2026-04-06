@@ -1,98 +1,165 @@
-"""DeepSeek 具体的 LLM 服务实现类。"""
-
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import time
 from typing import Any
 
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 
+from config import (
+    get_deepseek_api_key,
+    get_llm_concurrency,
+    get_llm_max_retries,
+    get_llm_rate_limit_rps,
+    get_llm_retry_base_delay,
+    get_llm_retry_max_delay,
+    get_llm_timeout_seconds,
+)
 from llm_base import LLMService
+from observability import log_llm_call
 from prompts import SYSTEM_INSTRUCTION, build_user_prompt
-from config import get_deepseek_api_key
+from resilience import RetryConfig, TokenBucketRateLimiter, run_with_retry, run_with_retry_async
 from schemas import SentimentAnalysisResult
 
-class DeepSeekService(LLMService):
-    """
-    使用 DeepSeek API (OpenAI 兼容接口) 实现的 LLM 服务。
-    """
 
+class DeepSeekService(LLMService):
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or get_deepseek_api_key()
         self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
         self.base_url = "https://api.deepseek.com"
-        
-        # 初始化同步客户端
-        if self.api_key:
-            self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-            self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
-        else:
-            self._client = None
-            self._async_client = None
+        self.timeout_seconds = get_llm_timeout_seconds()
+        self.retry_config = RetryConfig(
+            max_retries=get_llm_max_retries(),
+            base_delay=get_llm_retry_base_delay(),
+            max_delay=get_llm_retry_max_delay(),
+        )
+        self._rate_limiter = TokenBucketRateLimiter(get_llm_rate_limit_rps())
+        self._semaphore = asyncio.Semaphore(get_llm_concurrency())
 
-    def _check_client(self):
-        if not self._client:
-            raise ValueError("DeepSeek API Key 未配置，请通过环境变量或 .env 设置。")
+        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
-    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
-        self._check_client()
-        if not review_text or not review_text.strip():
-            raise ValueError("评论文本不能为空")
+    @staticmethod
+    def _validate_input(review_text: str) -> str:
+        text = (review_text or "").strip()
+        if not text:
+            raise ValueError("review text cannot be empty")
+        return text
 
-        user_prompt = build_user_prompt(review_text)
-        
-        # 强制要求 JSON 格式
-        json_instruction = (
-            "\n\n请严格按以下 JSON 格式输出，不要包含任何 markdown 代码块标记：\n"
+    @staticmethod
+    def _json_instruction() -> str:
+        return (
+            "\n\nReturn strict JSON only, no markdown fences. JSON schema:\n"
             + json.dumps(SentimentAnalysisResult.model_json_schema(), ensure_ascii=False)
         )
 
-        response = self._client.chat.completions.create(
+    def _messages(self, text: str) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": SYSTEM_INSTRUCTION + self._json_instruction()},
+            {"role": "user", "content": build_user_prompt(text)},
+        ]
+
+    def analyze_review(self, review_text: str) -> SentimentAnalysisResult:
+        text = self._validate_input(review_text)
+        messages = self._messages(text)
+        started = time.perf_counter()
+        attempts = 1
+        try:
+            response, attempts = run_with_retry(
+                lambda: self._sync_call_once(messages),
+                retry_config=self.retry_config,
+            )
+            body = response.choices[0].message.content
+            if body is None or not str(body).strip():
+                raise RuntimeError("empty response from DeepSeek")
+            result = SentimentAnalysisResult.model_validate_json(body)
+            log_llm_call(
+                provider="deepseek",
+                model=self.model,
+                operation="analyze_review",
+                status="ok",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=attempts,
+                text_length=len(text),
+            )
+            return result
+        except Exception as exc:
+            log_llm_call(
+                provider="deepseek",
+                model=self.model,
+                operation="analyze_review",
+                status="error",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=attempts,
+                text_length=len(text),
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
+            raise
+
+    def _sync_call_once(self, messages: list[dict[str, str]]):
+        self._rate_limiter.acquire()
+        return self._client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTION + json_instruction},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,
+            timeout=self.timeout_seconds,
         )
-
-        raw = response.choices[0].message.content
-        if raw is None or not str(raw).strip():
-            raise RuntimeError("DeepSeek 返回了空文本。")
-
-        return SentimentAnalysisResult.model_validate_json(raw)
 
     def analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
         return self.analyze_review(review_text).model_dump()
 
     async def async_analyze_review(self, review_text: str) -> SentimentAnalysisResult:
-        self._check_client()
-        if not review_text or not review_text.strip():
-            raise ValueError("评论文本不能为空")
+        text = self._validate_input(review_text)
+        messages = self._messages(text)
+        started = time.perf_counter()
+        attempts = 1
+        try:
+            async with self._semaphore:
+                response, attempts = await run_with_retry_async(
+                    lambda: self._async_call_once(messages),
+                    retry_config=self.retry_config,
+                )
+            body = response.choices[0].message.content
+            if body is None or not str(body).strip():
+                raise RuntimeError("empty response from DeepSeek")
+            result = SentimentAnalysisResult.model_validate_json(body)
+            log_llm_call(
+                provider="deepseek",
+                model=self.model,
+                operation="async_analyze_review",
+                status="ok",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=attempts,
+                text_length=len(text),
+            )
+            return result
+        except Exception as exc:
+            log_llm_call(
+                provider="deepseek",
+                model=self.model,
+                operation="async_analyze_review",
+                status="error",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=attempts,
+                text_length=len(text),
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
+            raise
 
-        user_prompt = build_user_prompt(review_text)
-        json_instruction = (
-            "\n\n请严格按以下 JSON 格式输出，不要包含任何 markdown 代码块标记：\n"
-            + json.dumps(SentimentAnalysisResult.model_json_schema(), ensure_ascii=False)
-        )
-
-        response = await self._async_client.chat.completions.create(
+    async def _async_call_once(self, messages: list[dict[str, str]]):
+        await self._rate_limiter.acquire_async()
+        return await self._async_client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTION + json_instruction},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,
+            timeout=self.timeout_seconds,
         )
-
-        raw = response.choices[0].message.content
-        if raw is None or not str(raw).strip():
-            raise RuntimeError("DeepSeek [Async] 返回了空文本。")
-
-        return SentimentAnalysisResult.model_validate_json(raw)
 
     async def async_analyze_review_as_dict(self, review_text: str) -> dict[str, Any]:
         result = await self.async_analyze_review(review_text)

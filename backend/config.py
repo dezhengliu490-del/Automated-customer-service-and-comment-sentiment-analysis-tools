@@ -52,3 +52,54 @@ def get_llm_provider() -> str:
     从环境变量获取当前的 LLM 提供商。
     """
     return os.environ.get("LLM_PROVIDER", "gemini").lower().strip()
+
+
+def _get_float_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _get_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def get_llm_timeout_seconds() -> float:
+    return max(1.0, _get_float_env("LLM_TIMEOUT_SECONDS", 30.0))
+
+
+def get_llm_max_retries() -> int:
+    return max(0, _get_int_env("LLM_MAX_RETRIES", 3))
+
+
+def get_llm_retry_base_delay() -> float:
+    return max(0.05, _get_float_env("LLM_RETRY_BASE_DELAY", 0.8))
+
+
+def get_llm_retry_max_delay() -> float:
+    return max(0.1, _get_float_env("LLM_RETRY_MAX_DELAY", 8.0))
+
+
+def get_llm_concurrency() -> int:
+    return max(1, _get_int_env("LLM_MAX_CONCURRENCY", 8))
+
+
+def get_llm_rate_limit_rps() -> float:
+    return max(0.1, _get_float_env("LLM_RATE_LIMIT_RPS", 5.0))
+
+
+def get_llm_log_path() -> Path:
+    p = os.environ.get("LLM_LOG_PATH", "").strip()
+    if p:
+        return Path(p)
+    return Path(__file__).resolve().parent / "logs" / "llm_calls.jsonl"
