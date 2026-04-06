@@ -1,12 +1,7 @@
-"""
-第三周前端（Streamlit）：提供数据上传、预览、批量分析及单条分析功能。
-支持多模型切换（配置于 .env 文件中）。
-"""
-
 from __future__ import annotations
 
-import sys
 import asyncio
+import sys
 from pathlib import Path
 
 import altair as alt
@@ -28,6 +23,151 @@ from utils.loaders import load_dataframe
 # Session State 键名
 SS_DF = "workspace_df"
 SS_NAME = "workspace_filename"
+SS_BATCH_RESULTS = "batch_results"
+SS_BATCH_FAILED = "batch_failed"
+SS_BATCH_RUNNING = "batch_running"
+SS_BATCH_TEXT_COL = "batch_text_col"
+
+
+def _find_time_columns(df: pd.DataFrame) -> list[str]:
+    candidates: list[str] = []
+    for col in df.columns:
+        s = df[col]
+        if pd.api.types.is_datetime64_any_dtype(s):
+            candidates.append(col)
+            continue
+        if pd.api.types.is_object_dtype(s):
+            parsed = pd.to_datetime(s, errors="coerce")
+            # 仅当可解析比例较高时，认为是时间列
+            if len(parsed) > 0 and parsed.notna().mean() >= 0.7:
+                candidates.append(col)
+    return candidates
+
+
+def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n: dict[str, str]) -> None:
+    if "sentiment" not in res_df.columns:
+        return
+
+    chart_df = res_df[res_df["sentiment"].notna()].copy()
+    if chart_df.empty:
+        return
+
+    sentiment_order = ["positive", "neutral", "negative"]
+    sentiment_counts = chart_df["sentiment"].value_counts().reindex(sentiment_order, fill_value=0).reset_index()
+    sentiment_counts.columns = ["sentiment", "count"]
+
+    st.divider()
+    st.subheader(i18n["chart_title"])
+
+    c1, c2 = st.columns(2)
+    with c1:
+        bar_chart = alt.Chart(sentiment_counts).mark_bar(size=36).encode(
+            x=alt.X("sentiment:N", sort=sentiment_order, title="Sentiment", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("count:Q", title="Count"),
+            color=alt.Color(
+                "sentiment:N",
+                scale=alt.Scale(
+                    domain=sentiment_order,
+                    range=["#2ecc71", "#f1c40f", "#e74c3c"],
+                ),
+                legend=None,
+            ),
+            tooltip=["sentiment", "count"],
+        ).properties(height=320)
+        st.altair_chart(bar_chart, use_container_width=True)
+
+    with c2:
+        pie_chart = alt.Chart(sentiment_counts).mark_arc(innerRadius=55).encode(
+            theta=alt.Theta("count:Q"),
+            color=alt.Color(
+                "sentiment:N",
+                scale=alt.Scale(
+                    domain=sentiment_order,
+                    range=["#2ecc71", "#f1c40f", "#e74c3c"],
+                ),
+                title="Sentiment",
+            ),
+            tooltip=["sentiment", "count"],
+        ).properties(height=320)
+        st.altair_chart(pie_chart, use_container_width=True)
+
+    st.subheader(i18n["trend_title"])
+    time_cols = _find_time_columns(source_df)
+    if not time_cols:
+        st.info(i18n["trend_no_time"])
+        return
+
+    selected_time_col = st.selectbox(i18n["trend_pick_col"], options=time_cols, key="trend_time_col")
+    mapped = source_df[[selected_time_col]].copy()
+    mapped["index"] = mapped.index
+    merged = chart_df.merge(mapped, on="index", how="left")
+    merged["_ts"] = pd.to_datetime(merged[selected_time_col], errors="coerce")
+    merged = merged[merged["_ts"].notna()]
+
+    if merged.empty:
+        st.info(i18n["trend_no_data"])
+        return
+
+    trend_df = (
+        merged.assign(day=merged["_ts"].dt.date)
+        .groupby(["day", "sentiment"], as_index=False)
+        .size()
+        .rename(columns={"size": "count"})
+    )
+
+    line_chart = alt.Chart(trend_df).mark_line(point=True).encode(
+        x=alt.X("day:T", title="Date"),
+        y=alt.Y("count:Q", title="Count"),
+        color=alt.Color(
+            "sentiment:N",
+            scale=alt.Scale(
+                domain=sentiment_order,
+                range=["#2ecc71", "#f1c40f", "#e74c3c"],
+            ),
+            title="Sentiment",
+        ),
+        tooltip=["day:T", "sentiment", "count"],
+    ).properties(height=360)
+    st.altair_chart(line_chart, use_container_width=True)
+
+
+async def _run_batch_analysis(
+    service,
+    rows: list[tuple[int, str]],
+    progress,
+    progress_text,
+    status_placeholder,
+) -> list[dict]:
+    total = len(rows)
+    finished_count = 0
+    failed_count = 0
+
+    async def one_call(current_idx: int, raw_text: str) -> dict:
+        nonlocal finished_count, failed_count
+        try:
+            res = await service.async_analyze_review_as_dict(str(raw_text))
+            return {
+                "index": current_idx,
+                "preview": str(raw_text)[:80] + ("..." if len(str(raw_text)) > 80 else ""),
+                "raw_text": str(raw_text),
+                **res,
+            }
+        except Exception as exc:
+            failed_count += 1
+            return {
+                "index": current_idx,
+                "preview": str(raw_text)[:80] + ("..." if len(str(raw_text)) > 80 else ""),
+                "raw_text": str(raw_text),
+                "error": str(exc),
+            }
+        finally:
+            finished_count += 1
+            progress.progress(finished_count / total, text=f"{progress_text} {finished_count}/{total}")
+            status_placeholder.caption(f"Completed: {finished_count}/{total} | Failed: {failed_count}")
+
+    tasks = [one_call(idx, text) for idx, text in rows]
+    return await asyncio.gather(*tasks)
+
 
 # 配置 Streamlit 页面属性
 st.set_page_config(
@@ -41,7 +181,6 @@ with st.sidebar:
     lang_choice = st.radio("Language / 语言", options=["中文", "English"], index=0)
     lang = "zh" if lang_choice == "中文" else "en"
 
-    # 多语言文案
     I18N = {
         "zh": {
             "sidebar_header": "评论分析系统",
@@ -73,7 +212,15 @@ with st.sidebar:
             "success_done": "分析已完成",
             "btn_clean": "数据清洗",
             "subheader_stats": "清洗结果报告",
-            "chart_title": "情感分布柱状图",
+            "chart_title": "情感分布可视化",
+            "trend_title": "情感时间趋势",
+            "trend_pick_col": "选择时间列",
+            "trend_no_time": "未检测到可用时间列，无法绘制趋势图。",
+            "trend_no_data": "时间列存在，但当前分析结果无法映射出有效时间数据。",
+            "failed_title": "失败项明细",
+            "failed_retry": "重试失败项",
+            "failed_none": "当前批次无失败项。",
+            "running_tip": "任务执行中，请勿重复提交。",
         },
         "en": {
             "sidebar_header": "Sentiment Analysis",
@@ -105,35 +252,34 @@ with st.sidebar:
             "success_done": "Completed",
             "btn_clean": "Clean Data",
             "subheader_stats": "Cleaning Stats",
-            "chart_title": "Sentiment Distribution",
+            "chart_title": "Sentiment Visuals",
+            "trend_title": "Sentiment Trend Over Time",
+            "trend_pick_col": "Pick a time column",
+            "trend_no_time": "No usable time column detected, trend chart unavailable.",
+            "trend_no_data": "Time column exists but no valid mapped dates in current results.",
+            "failed_title": "Failed Items",
+            "failed_retry": "Retry Failed Items",
+            "failed_none": "No failed items in this batch.",
+            "running_tip": "A batch is running. Please avoid duplicate submissions.",
         },
     }
     d = I18N[lang]
 
     st.header(d["sidebar_header"])
     st.divider()
-    
-    # --- 模型配置区 ---
+
     with st.expander(d["sidebar_config"], expanded=True):
         p_choice = st.selectbox(d["config_provider"], ["Gemini", "DeepSeek"], index=1)
-        
-        default_models = {
-            "Gemini": "gemini-2.5-flash",
-            "DeepSeek": "deepseek-chat"
-        }
+        default_models = {"Gemini": "gemini-2.5-flash", "DeepSeek": "deepseek-chat"}
         selected_model = st.text_input(d["config_model"], value=default_models.get(p_choice, ""))
-        
-        # 存入 session_state
         st.session_state["llm_provider"] = p_choice.lower()
         st.session_state["llm_model"] = selected_model
 
-# --- 页面逻辑 ---
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
 
 tab_batch, tab_single = st.tabs([d["tab_batch"], d["tab_single"]])
 
-# 文件上传
 with st.expander(d["expander_upload"], expanded=True):
     uploaded = st.file_uploader(d["file_uploader_label"], type=["csv", "xlsx", "xls"])
     if uploaded:
@@ -141,30 +287,34 @@ with st.expander(d["expander_upload"], expanded=True):
         st.session_state[SS_DF] = df_new
         st.session_state[SS_NAME] = uploaded.name
     if st.session_state.get(SS_DF) is not None:
-        if st.button(d["btn_clear"]):
-            for k in [SS_DF, SS_NAME]:
+        if st.button(d["btn_clear"], key="btn_clear_data"):
+            for k in [SS_DF, SS_NAME, SS_BATCH_RESULTS, SS_BATCH_FAILED, SS_BATCH_TEXT_COL]:
                 st.session_state.pop(k, None)
             st.rerun()
 
 df = st.session_state.get(SS_DF)
 
-# 批量分析
 with tab_batch:
+    if st.session_state.get(SS_BATCH_RUNNING):
+        st.info(d["running_tip"])
+
     if df is None:
         st.info("Wait for upload...")
     else:
         st.subheader(d["subheader_preview"])
         c1, c2, c3 = st.columns(3)
-        with c1: st.metric(d["metric_rows"], f"{len(df):,}")
-        with c2: st.metric(d["metric_cols"], len(df.columns))
-        with c3: st.metric("Provider", st.session_state.llm_provider.upper())
-        
+        with c1:
+            st.metric(d["metric_rows"], f"{len(df):,}")
+        with c2:
+            st.metric(d["metric_cols"], len(df.columns))
+        with c3:
+            st.metric("Provider", st.session_state.llm_provider.upper())
+
         st.dataframe(df.head(100), use_container_width=True)
 
         st.subheader(d["subheader_sample"])
-        col_text = st.selectbox(d["selectbox_col"], list(df.columns))
+        col_text = st.selectbox(d["selectbox_col"], list(df.columns), key="select_col_text")
 
-        # --- 新增：数据清洗逻辑 ---
         with st.expander(d["btn_clean"]):
             c1, c2 = st.columns(2)
             with c1:
@@ -173,97 +323,132 @@ with tab_batch:
             with c2:
                 do_dup_row = st.checkbox("整行去重 (Row)", value=False)
                 min_len = st.number_input("最小长度 (Min Len)", value=5, min_value=1)
-            
-            if st.button(d["btn_clean"], use_container_width=True):
+
+            if st.button(d["btn_clean"], use_container_width=True, key="btn_clean_data"):
                 cleaned_df, stats = clean_review_dataframe(
-                    df, col_text,
+                    df,
+                    col_text,
                     drop_duplicate_text=do_dup_text,
                     drop_empty_text=do_empty,
                     drop_full_row_duplicates=do_dup_row,
-                    min_length=min_len
+                    min_length=min_len,
                 )
                 st.session_state[SS_DF] = cleaned_df
-                st.info(f"""
+                st.info(
+                    f"""
                 **{d['subheader_stats']}**
                 - {d['metric_rows']} IN: {stats['rows_in']}
                 - {d['metric_rows']} OUT: {stats['rows_out']}
                 - 空文字过滤: {stats['empty_dropped']}
                 - 长度过滤 (<{min_len}): {stats['too_short_dropped']}
                 - 文本去重: {stats['dup_text_dropped']}
-                """)
+                """
+                )
                 st.rerun()
 
-        n_rows = st.number_input(d["slider_n"], min_value=1, max_value=max(1, len(df)), value=min(max(1, len(df)), 5), step=1)
+        n_rows = st.number_input(
+            d["slider_n"],
+            min_value=1,
+            max_value=max(1, len(df)),
+            value=min(max(1, len(df)), 5),
+            step=1,
+            key="number_batch_rows",
+        )
 
-        if st.button(d["btn_start"], type="primary"):
-            sample = df.head(n_rows)
-            texts = sample[col_text]
+        run_disabled = bool(st.session_state.get(SS_BATCH_RUNNING, False))
+        if st.button(d["btn_start"], type="primary", disabled=run_disabled, key="btn_run_batch"):
+            sample = df.head(int(n_rows))
+            rows = [(int(idx), str(raw)) for idx, raw in sample[col_text].items()]
+
             progress = st.progress(0.0, text=d["progress_preparing"])
+            status_placeholder = st.empty()
 
-            async def run_batch():
-                # 核心：通过工厂获取服务（由于没有传 api_key，将自动读取 .env）
-                try:
-                    service = get_llm_service(
-                        provider=st.session_state.llm_provider,
-                        model=st.session_state.llm_model
+            try:
+                st.session_state[SS_BATCH_RUNNING] = True
+                service = get_llm_service(
+                    provider=st.session_state.llm_provider,
+                    model=st.session_state.llm_model,
+                )
+                results = asyncio.run(
+                    _run_batch_analysis(
+                        service,
+                        rows,
+                        progress,
+                        progress_text="Analyzing",
+                        status_placeholder=status_placeholder,
                     )
-                except Exception as e:
-                    st.error(f"Failed to init LLM: {e}")
-                    return []
-                
-                finished_count = 0
-                tasks = []
-                for i, (idx, raw) in enumerate(texts.items()):
-                    async def one_call(t, current_idx=idx):
-                        nonlocal finished_count
-                        try:
-                            res = await service.async_analyze_review_as_dict(str(t))
-                            finished_count += 1
-                            progress.progress(finished_count / n_rows, text=f"Analyzing {finished_count}/{n_rows}")
-                            return {"index": current_idx, "text": str(t)[:50]+"...", **res}
-                        except Exception as e:
-                            finished_count += 1
-                            progress.progress(finished_count / n_rows, text=f"Analyzing {finished_count}/{n_rows}")
-                            return {"index": current_idx, "text": str(t)[:50]+"...", "error": str(e)}
-                    tasks.append(one_call(raw))
-                
-                return await asyncio.gather(*tasks)
-
-            results = asyncio.run(run_batch())
-            if results:
-                st.success(d["progress_done"])
+                )
                 res_df = pd.DataFrame(results)
-                st.dataframe(res_df, use_container_width=True)
+                st.session_state[SS_BATCH_RESULTS] = res_df
+                st.session_state[SS_BATCH_TEXT_COL] = col_text
+                if "error" in res_df.columns:
+                    st.session_state[SS_BATCH_FAILED] = res_df[res_df["error"].notna()].copy()
+                else:
+                    st.session_state[SS_BATCH_FAILED] = pd.DataFrame()
+                st.success(d["progress_done"])
+            except Exception as exc:
+                st.error(f"Failed to run batch: {exc}")
+            finally:
+                st.session_state[SS_BATCH_RUNNING] = False
 
-                # --- 新增：柱状图可视化 ---
-                if "sentiment" in res_df.columns:
-                    st.divider()
-                    st.subheader(d["chart_title"])
-                    
-                    # 统计频次
-                    sentiment_counts = res_df["sentiment"].value_counts().reset_index()
-                    sentiment_counts.columns = ["sentiment", "count"]
-                    
-                    # 使用 Altair 绘制美观柱状图
-                    chart = alt.Chart(sentiment_counts).mark_bar(size=40).encode(
-                        x=alt.X("sentiment:N", 
-                                sort=["positive", "neutral", "negative"], 
-                                title="Sentiment",
-                                axis=alt.Axis(labelAngle=0)),
-                        y=alt.Y("count:Q", title="Count"),
-                        color=alt.Color("sentiment:N", scale=alt.Scale(
-                            domain=["positive", "neutral", "negative"],
-                            range=["#2ecc71", "#f1c40f", "#e74c3c"]
-                        ))
-                    ).properties(height=400)
-                    
-                    st.altair_chart(chart, use_container_width=True)
+        res_df = st.session_state.get(SS_BATCH_RESULTS)
+        if isinstance(res_df, pd.DataFrame) and not res_df.empty:
+            st.dataframe(res_df.drop(columns=["raw_text"], errors="ignore"), use_container_width=True)
 
-# 单条分析
+            failed_df = st.session_state.get(SS_BATCH_FAILED)
+            st.subheader(d["failed_title"])
+            if isinstance(failed_df, pd.DataFrame) and not failed_df.empty:
+                st.dataframe(
+                    failed_df[["index", "preview", "error"]],
+                    use_container_width=True,
+                )
+
+                if st.button(d["failed_retry"], key="btn_retry_failed"):
+                    retry_rows = [(int(r["index"]), str(r["raw_text"])) for _, r in failed_df.iterrows()]
+                    progress = st.progress(0.0, text="Retrying failed items...")
+                    status_placeholder = st.empty()
+                    try:
+                        st.session_state[SS_BATCH_RUNNING] = True
+                        service = get_llm_service(
+                            provider=st.session_state.llm_provider,
+                            model=st.session_state.llm_model,
+                        )
+                        retried = asyncio.run(
+                            _run_batch_analysis(
+                                service,
+                                retry_rows,
+                                progress,
+                                progress_text="Retrying",
+                                status_placeholder=status_placeholder,
+                            )
+                        )
+                        retry_df = pd.DataFrame(retried)
+
+                        merged = pd.concat(
+                            [res_df[~res_df["index"].isin(retry_df["index"])], retry_df],
+                            ignore_index=True,
+                        ).sort_values("index")
+
+                        st.session_state[SS_BATCH_RESULTS] = merged
+                        if "error" in merged.columns:
+                            st.session_state[SS_BATCH_FAILED] = merged[merged["error"].notna()].copy()
+                        else:
+                            st.session_state[SS_BATCH_FAILED] = pd.DataFrame()
+                        st.success("Retry completed")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Retry failed: {exc}")
+                    finally:
+                        st.session_state[SS_BATCH_RUNNING] = False
+            else:
+                st.info(d["failed_none"])
+
+            _render_sentiment_charts(res_df, df, d)
+
 with tab_single:
     st.subheader(d["subheader_single"])
     text_input = st.text_area(d["label_text"], height=150)
-    if st.button(d["btn_single"], type="primary"):
+    if st.button(d["btn_single"], type="primary", key="btn_single_analyze"):
         if not text_input.strip():
             st.warning(d["warn_empty_text"])
         else:
@@ -271,10 +456,10 @@ with tab_single:
                 try:
                     service = get_llm_service(
                         provider=st.session_state.llm_provider,
-                        model=st.session_state.llm_model
+                        model=st.session_state.llm_model,
                     )
                     res = service.analyze_review_as_dict(text_input.strip())
                     st.success(d["success_done"])
                     st.json(res)
-                except Exception as e:
-                    st.error(d["error_runtime"].format(e=e))
+                except Exception as exc:
+                    st.error(d["error_runtime"].format(e=exc))
