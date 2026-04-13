@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -29,6 +30,28 @@ SS_BATCH_FAILED = "batch_failed"
 SS_BATCH_RUNNING = "batch_running"
 SS_BATCH_TEXT_COL = "batch_text_col"
 SS_CS_CHAT_HISTORY = "customer_service_chat_history"
+
+
+_EN_WORD = re.compile(r"[A-Za-z]+")
+_CJK_CHAR = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _should_reply_in_english(config_lang: str, text: str) -> bool:
+    """Use English when config is en, or input text is likely English."""
+    if (config_lang or "").strip().lower() == "en":
+        return True
+    src = (text or "").strip()
+    if not src:
+        return False
+
+    en_words = _EN_WORD.findall(src)
+    cjk_chars = _CJK_CHAR.findall(src)
+    if len(en_words) >= 3 and len(cjk_chars) == 0:
+        return True
+    ascii_letters = sum(ch.isascii() and ch.isalpha() for ch in src)
+    if ascii_letters >= 12 and ascii_letters > len(cjk_chars) * 2:
+        return True
+    return False
 
 
 def _detect_review_column(df: pd.DataFrame) -> str | None:
@@ -586,9 +609,17 @@ with tab_single:
                         provider=st.session_state.llm_provider,
                         model=st.session_state.llm_model,
                     )
+                    single_lang = (
+                        "en"
+                        if _should_reply_in_english(
+                            st.session_state.get("summary_language", "zh"),
+                            text_input,
+                        )
+                        else "zh"
+                    )
                     res = service.analyze_review_as_dict(
                         text_input.strip(),
-                        summary_language=st.session_state.get("summary_language", "zh"),
+                        summary_language=single_lang,
                     )
                     st.success(d["success_done"])
                     st.json(res)
@@ -642,7 +673,14 @@ with tab_cs:
                         sentiment=sentiment_hint or None,
                         pain_points=pain_points,
                         style_hint=style_hint.strip() or None,
-                        reply_language=st.session_state.get("summary_language", "zh"),
+                        reply_language=(
+                            "en"
+                            if _should_reply_in_english(
+                                st.session_state.get("summary_language", "zh"),
+                                review_text,
+                            )
+                            else "zh"
+                        ),
                     )
                     st.session_state[SS_CS_CHAT_HISTORY].append(
                         {
