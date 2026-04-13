@@ -73,9 +73,25 @@ def build_customer_service_user_prompt(
     sentiment: str | None = None,
     pain_points: list[str] | None = None,
     style_hint: str | None = None,
+    reply_language: str = "zh",
 ) -> str:
-    rules = (merchant_rules or "").strip() or "（未提供商家规则）"
+    lang = normalize_summary_language(reply_language)
     s = (sentiment or "unknown").strip()
+
+    if lang == "en":
+        rules = (merchant_rules or "").strip() or "(No merchant rules provided)"
+        pp = ", ".join(pain_points or []) if pain_points else "none"
+        style = (style_hint or "default customer-service tone").strip()
+        return (
+            f"[Customer review]\n{review_text.strip()}\n\n"
+            f"[Sentiment hint]\n{s}\n\n"
+            f"[Pain points]\n{pp}\n\n"
+            f"[Merchant rules]\n{rules}\n\n"
+            f"[Style hint]\n{style}\n\n"
+            "Please generate ONE customer-service reply in English."
+        )
+
+    rules = (merchant_rules or "").strip() or "（未提供商家规则）"
     pp = "、".join(pain_points or []) if pain_points else "无"
     style = (style_hint or "默认客服语气").strip()
     return (
@@ -84,7 +100,7 @@ def build_customer_service_user_prompt(
         f"【痛点短语】\n{pp}\n\n"
         f"【商家规则】\n{rules}\n\n"
         f"【风格偏好】\n{style}\n\n"
-        "请基于以上信息生成一段客服回复。"
+        "请基于以上信息生成一段中文客服回复。"
     )
 
 
@@ -98,4 +114,5 @@ def build_reply_user_prompt(review_text: str, sentiment: str, pain_points: list[
         merchant_rules="",
         sentiment=sentiment,
         pain_points=pain_points,
+        reply_language="zh",
     )

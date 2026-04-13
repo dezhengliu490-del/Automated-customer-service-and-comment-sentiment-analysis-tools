@@ -90,6 +90,7 @@ class CustomerServiceReplyEngine:
             sentiment=sentiment,
             pain_points=pain_points,
             style_hint=style_hint,
+            reply_language=lang,
         )
         return system_instruction, user_prompt
 
