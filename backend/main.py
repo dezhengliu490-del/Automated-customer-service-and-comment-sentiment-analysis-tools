@@ -1,77 +1,81 @@
-"""
-后端入口：单条文本输入 -> LLM Factory -> 结构化 JSON 输出。
-
-支持多种大模型提供商，通过修改 .env 中的 LLM_PROVIDER 切换。
-现在模型调用已抽象化为 LLMService 接口。
-"""
-
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
-import sys
 import json
+import sys
 from pathlib import Path
 
-from llm_factory import get_llm_service
 from config import get_llm_provider
+from customer_service import generate_customer_service_reply_as_dict
+from llm_factory import get_llm_service
 
-def _read_text(args: argparse.Namespace) -> str:
-    """根据参数从文件、参数或标准输入读取文本。"""
-    if args.file:
-        path = Path(args.file)
-        if not path.is_file():
-            raise SystemExit(f"文件未找到: {path}")
-        return path.read_text(encoding="utf-8")
-    if args.text is not None:
-        return args.text
+
+def _read_text_arg(text_arg: str | None, file_path: str | None) -> str:
+    if file_path:
+        p = Path(file_path)
+        if not p.is_file():
+            raise SystemExit(f"file not found: {p}")
+        return p.read_text(encoding="utf-8")
+    if text_arg is not None:
+        return text_arg
     return sys.stdin.read()
 
 
 def main() -> None:
-    """解析命令行参数并执行分析任务。"""
     provider = get_llm_provider()
     parser = argparse.ArgumentParser(
-        description=f"通过 {provider.upper()} API 分析单条评论；并打印结构化 JSON 结果。"
+        description=(
+            f"LLM backend CLI ({provider}). "
+            "task=analyze for sentiment analysis, task=reply for customer-service reply generation."
+        )
     )
+    parser.add_argument("text", nargs="?", default=None, help="review text; if omitted, read from stdin")
+    parser.add_argument("--file", "-f", metavar="PATH", help="read review text from UTF-8 file")
     parser.add_argument(
-        "text",
-        nargs="?",
-        default=None,
-        help="单条评论文本。如果省略，则从标准输入（stdin）读取。",
+        "--task",
+        choices=["analyze", "reply"],
+        default="analyze",
+        help="analyze: sentiment analysis; reply: customer-service reply",
     )
-    parser.add_argument(
-        "--file",
-        "-f",
-        metavar="PATH",
-        help="从指定的 UTF-8 文件中读取评论文本，而不是从命令行参数或标准输入读取。",
-    )
+    parser.add_argument("--summary-language", default="zh", help="summary language for analyze task: zh/en")
+    parser.add_argument("--reply-language", default="zh", help="reply language for reply task: zh/en")
+    parser.add_argument("--merchant-rules", default="", help="merchant rule text used in reply task")
+    parser.add_argument("--merchant-rules-file", default=None, help="UTF-8 file path for merchant rules")
+    parser.add_argument("--sentiment", default=None, help="optional sentiment hint for reply task")
+    parser.add_argument("--pain-points", default="", help="optional pain points, comma-separated")
+    parser.add_argument("--style-hint", default=None, help="optional style hint for reply tone")
+
     args = parser.parse_args()
 
-    # 检查互斥参数
     if args.file and args.text is not None:
-        raise SystemExit("请使用位置参数文本或 --file 参数，不要同时使用两者。")
+        raise SystemExit("use either positional text or --file, not both")
 
-    body = _read_text(args).strip()
-    if not body:
-        raise SystemExit("无输入文本：请传入字符串、使用 --file 或管道输入。")
+    review_text = _read_text_arg(args.text, args.file).strip()
+    if not review_text:
+        raise SystemExit("empty input text")
 
     try:
-        # 1. 获取 LLM 服务实例
-        service = get_llm_service()
-        
-        # 2. 执行分析并获取字典结果
-        result_dict = service.analyze_review_as_dict(body)
-        
-        # 3. 转换为格式化的 JSON 字符串
-        out = json.dumps(result_dict, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
-        # 通用错误处理，根据需要可以细化
-        error_type = type(e).__name__
-        raise SystemExit(f"[{provider.upper()} 错误] {error_type}: {e}") from e
+        if args.task == "analyze":
+            service = get_llm_service()
+            result = service.analyze_review_as_dict(
+                review_text,
+                summary_language=args.summary_language,
+            )
+        else:
+            rules_text = _read_text_arg(None, args.merchant_rules_file) if args.merchant_rules_file else args.merchant_rules
+            pain_points = [x.strip() for x in (args.pain_points or "").split(",") if x.strip()]
+            result = generate_customer_service_reply_as_dict(
+                review_text=review_text,
+                merchant_rules=rules_text,
+                sentiment=args.sentiment,
+                pain_points=pain_points or None,
+                style_hint=args.style_hint,
+                reply_language=args.reply_language,
+            )
 
-    # 打印最终结果
-    print(out)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    except Exception as exc:
+        raise SystemExit(f"[{provider.upper()} ERROR] {type(exc).__name__}: {exc}") from exc
 
 
 if __name__ == "__main__":
