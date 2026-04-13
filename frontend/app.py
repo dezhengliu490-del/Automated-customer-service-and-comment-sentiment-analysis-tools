@@ -15,6 +15,7 @@ if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from llm_factory import get_llm_service
+from customer_service import generate_customer_service_reply_as_dict
 
 # 导入前端工具函数
 from utils.cleaning import clean_review_dataframe
@@ -27,6 +28,7 @@ SS_BATCH_RESULTS = "batch_results"
 SS_BATCH_FAILED = "batch_failed"
 SS_BATCH_RUNNING = "batch_running"
 SS_BATCH_TEXT_COL = "batch_text_col"
+SS_CS_CHAT_HISTORY = "customer_service_chat_history"
 
 
 def _detect_review_column(df: pd.DataFrame) -> str | None:
@@ -267,6 +269,7 @@ with st.sidebar:
             "page_subtitle": "基于大语言模型（LLM）的评论内容自动化情感分析与汇总。",
             "tab_batch": "批量分析",
             "tab_single": "单条评论",
+            "tab_cs_chat": "模拟客服聊天",
             "expander_upload": "① 上传文件",
             "file_uploader_label": "选择 CSV 或 Excel",
             "btn_clear": "清空数据",
@@ -299,6 +302,18 @@ with st.sidebar:
             "failed_retry": "重试失败项",
             "failed_none": "当前批次无失败项。",
             "running_tip": "任务执行中，请勿重复提交。",
+            "cs_intro": "输入用户评论/提问，结合商家规则实时生成客服回复。",
+            "cs_review": "用户评论 / 提问",
+            "cs_rules": "商家规则（可留空）",
+            "cs_style": "语气偏好（可选）",
+            "cs_sentiment": "情感提示（可选）",
+            "cs_pain_points": "痛点关键词（可选，用逗号分隔）",
+            "cs_btn_reply": "生成回复",
+            "cs_btn_clear": "清空聊天记录",
+            "cs_thinking": "客服 AI 正在生成回复...",
+            "cs_error": "生成失败：{e}",
+            "cs_warn_empty": "请输入用户评论或提问。",
+            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules}",
             "lang_zh": "中文",
             "lang_en": "English",
         },
@@ -312,6 +327,7 @@ with st.sidebar:
             "page_subtitle": "Automated review analysis dashboard powered by Large Language Models.",
             "tab_batch": "Batch Analysis",
             "tab_single": "Single Review",
+            "tab_cs_chat": "Simulated CS Chat",
             "expander_upload": "① Upload file",
             "file_uploader_label": "Select CSV or Excel",
             "btn_clear": "Clear",
@@ -344,6 +360,18 @@ with st.sidebar:
             "failed_retry": "Retry Failed Items",
             "failed_none": "No failed items in this batch.",
             "running_tip": "A batch is running. Please avoid duplicate submissions.",
+            "cs_intro": "Enter a customer review/question and generate an AI customer-service reply with merchant rules context.",
+            "cs_review": "Customer review / question",
+            "cs_rules": "Merchant rules (optional)",
+            "cs_style": "Style hint (optional)",
+            "cs_sentiment": "Sentiment hint (optional)",
+            "cs_pain_points": "Pain points (optional, comma-separated)",
+            "cs_btn_reply": "Generate reply",
+            "cs_btn_clear": "Clear chat history",
+            "cs_thinking": "Generating customer-service reply...",
+            "cs_error": "Generation failed: {e}",
+            "cs_warn_empty": "Please enter a review or question.",
+            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules}",
             "lang_zh": "Chinese",
             "lang_en": "English",
         },
@@ -370,7 +398,7 @@ with st.sidebar:
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
 
-tab_batch, tab_single = st.tabs([d["tab_batch"], d["tab_single"]])
+tab_batch, tab_single, tab_cs = st.tabs([d["tab_batch"], d["tab_single"], d["tab_cs_chat"]])
 
 with st.expander(d["expander_upload"], expanded=True):
     uploaded = st.file_uploader(d["file_uploader_label"], type=["csv", "xlsx", "xls"])
@@ -566,3 +594,74 @@ with tab_single:
                     st.json(res)
                 except Exception as exc:
                     st.error(d["error_runtime"].format(e=exc))
+
+with tab_cs:
+    st.subheader(d["tab_cs_chat"])
+    st.caption(d["cs_intro"])
+
+    if SS_CS_CHAT_HISTORY not in st.session_state:
+        st.session_state[SS_CS_CHAT_HISTORY] = []
+
+    with st.expander("Context / 上下文", expanded=True):
+        review_text = st.text_area(d["cs_review"], height=120, key="cs_review_text")
+        merchant_rules = st.text_area(d["cs_rules"], height=120, key="cs_rules_text")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            style_hint = st.text_input(d["cs_style"], key="cs_style_hint")
+        with col_b:
+            sentiment_hint = st.selectbox(
+                d["cs_sentiment"],
+                options=["", "positive", "neutral", "negative"],
+                index=0,
+                key="cs_sentiment_hint",
+            )
+        pain_points_raw = st.text_input(d["cs_pain_points"], key="cs_pain_points")
+
+    btn_col1, btn_col2 = st.columns([1, 1])
+    with btn_col1:
+        do_reply = st.button(d["cs_btn_reply"], type="primary", use_container_width=True)
+    with btn_col2:
+        do_clear = st.button(d["cs_btn_clear"], use_container_width=True)
+
+    if do_clear:
+        st.session_state[SS_CS_CHAT_HISTORY] = []
+        st.rerun()
+
+    if do_reply:
+        if not review_text.strip():
+            st.warning(d["cs_warn_empty"])
+        else:
+            pain_points = [x.strip() for x in pain_points_raw.split(",") if x.strip()] if pain_points_raw else None
+            with st.spinner(d["cs_thinking"]):
+                try:
+                    res = generate_customer_service_reply_as_dict(
+                        review_text=review_text.strip(),
+                        merchant_rules=merchant_rules.strip(),
+                        provider=st.session_state.get("llm_provider", "deepseek"),
+                        model=st.session_state.get("llm_model") or None,
+                        sentiment=sentiment_hint or None,
+                        pain_points=pain_points,
+                        style_hint=style_hint.strip() or None,
+                        reply_language=st.session_state.get("summary_language", "zh"),
+                    )
+                    st.session_state[SS_CS_CHAT_HISTORY].append(
+                        {
+                            "review_text": review_text.strip(),
+                            "reply_text": res.get("reply_text", ""),
+                            "meta": d["cs_meta"].format(
+                                provider=res.get("provider", "-"),
+                                model=res.get("model", "-"),
+                                used_rules=res.get("used_rules", False),
+                            ),
+                        }
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(d["cs_error"].format(e=exc))
+
+    for item in st.session_state.get(SS_CS_CHAT_HISTORY, []):
+        with st.chat_message("user"):
+            st.write(item["review_text"])
+        with st.chat_message("assistant"):
+            st.write(item["reply_text"])
+            st.caption(item["meta"])
