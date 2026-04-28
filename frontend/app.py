@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import pandas as pd
@@ -17,6 +19,8 @@ if str(_BACKEND) not in sys.path:
 
 from llm_factory import get_llm_service
 from customer_service import generate_customer_service_reply_as_dict
+from insights import top_pain_points_from_results
+from rag_utils import SimpleRAGIndex
 
 # 导入前端工具函数
 from utils.cleaning import clean_review_dataframe
@@ -34,6 +38,48 @@ SS_CS_CHAT_HISTORY = "customer_service_chat_history"
 
 _EN_WORD = re.compile(r"[A-Za-z]+")
 _CJK_CHAR = re.compile(r"[\u4e00-\u9fff]")
+_KB_DIR = _ROOT / "data" / "kb"
+_SENTIMENT_ORDER = ["positive", "neutral", "negative"]
+_SENTIMENT_COLORS = ["#10b981", "#f59e0b", "#ef4444"]
+
+_DEMO_POSITIVE_WORDS = [
+    "好",
+    "满意",
+    "喜欢",
+    "不错",
+    "流畅",
+    "推荐",
+    "excellent",
+    "great",
+    "good",
+    "love",
+    "satisfied",
+]
+_DEMO_NEGATIVE_WORDS = [
+    "差",
+    "坏",
+    "慢",
+    "破",
+    "退款",
+    "退货",
+    "失望",
+    "问题",
+    "broken",
+    "bad",
+    "slow",
+    "poor",
+    "refund",
+    "disappointed",
+]
+_DEMO_PAIN_KEYWORDS = {
+    "物流慢": ["物流", "快递", "配送", "送货", "shipping", "delivery", "slow"],
+    "包装破损": ["包装", "破损", "压坏", "漏", "package", "packaging", "damaged"],
+    "质量不稳定": ["质量", "做工", "瑕疵", "坏", "断", "裂", "quality", "defect", "broken"],
+    "尺寸不符": ["尺码", "尺寸", "偏大", "偏小", "size", "fit"],
+    "客服响应慢": ["客服", "没人", "回复", "售后", "service", "support", "reply"],
+    "价格体验不佳": ["贵", "价格", "优惠", "price", "expensive"],
+    "功能故障": ["卡顿", "闪退", "不能用", "故障", "bug", "crash", "stuck"],
+}
 
 
 def _should_reply_in_english(config_lang: str, text: str) -> bool:
@@ -52,6 +98,217 @@ def _should_reply_in_english(config_lang: str, text: str) -> bool:
     if ascii_letters >= 12 and ascii_letters > len(cjk_chars) * 2:
         return True
     return False
+
+
+def _inject_demo_css() -> None:
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            padding-top: 1.4rem;
+            padding-bottom: 2.4rem;
+        }
+        [data-testid="stSidebar"] {
+            background: #f8fafc;
+        }
+        div[data-testid="stMetric"] {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+        div[data-testid="stMetric"] label {
+            color: #475569;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 6px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px 8px 0 0;
+            padding: 10px 16px;
+        }
+        .stButton > button {
+            border-radius: 7px;
+            font-weight: 600;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _available_kb_files(lang: str) -> list[Path]:
+    if not _KB_DIR.exists():
+        return []
+    files = sorted(_KB_DIR.glob("*.md"))
+    if lang == "en":
+        return sorted(files, key=lambda p: (not p.stem.endswith("_en"), p.name))
+    return sorted(files, key=lambda p: (p.stem.endswith("_en"), p.name))
+
+
+def _read_kb_files(paths: list[Path]) -> str:
+    chunks: list[str] = []
+    for path in paths:
+        try:
+            chunks.append(f"# {path.stem}\n{path.read_text(encoding='utf-8')}")
+        except OSError:
+            continue
+    return "\n\n".join(chunks).strip()
+
+
+def _coerce_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, float) and pd.isna(value):
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(x).strip() for x in value if str(x).strip()]
+
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "null"}:
+        return []
+
+    if text.startswith("[") and text.endswith("]"):
+        try:
+            parsed = ast.literal_eval(text)
+            return _coerce_text_list(parsed)
+        except (SyntaxError, ValueError):
+            pass
+
+    for sep in ["，", ",", "；", ";", "|", "\n"]:
+        if sep in text:
+            return [x.strip() for x in text.split(sep) if x.strip()]
+    return [text]
+
+
+def _results_to_records(res_df: pd.DataFrame) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for row in res_df.to_dict("records"):
+        row["sentiment"] = str(row.get("sentiment", "")).strip().lower()
+        row["pain_points"] = _coerce_text_list(row.get("pain_points"))
+        records.append(row)
+    return records
+
+
+def _record_summary(row: dict[str, Any], lang: str) -> str:
+    keys = ["summary_en", "summary", "summary_zh"] if lang == "en" else ["summary_zh", "summary", "summary_en"]
+    for key in keys:
+        val = str(row.get(key, "") or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def _shorten(text: Any, limit: int = 220) -> str:
+    val = re.sub(r"\s+", " ", str(text or "")).strip()
+    return val if len(val) <= limit else f"{val[:limit]}..."
+
+
+def _local_analyze_review(review_text: str, summary_language: str = "zh") -> dict[str, Any]:
+    text = (review_text or "").strip()
+    lower_text = text.lower()
+    pos_score = sum(1 for word in _DEMO_POSITIVE_WORDS if word in lower_text or word in text)
+    neg_score = sum(1 for word in _DEMO_NEGATIVE_WORDS if word in lower_text or word in text)
+
+    if neg_score > pos_score:
+        sentiment = "negative"
+    elif pos_score > neg_score:
+        sentiment = "positive"
+    else:
+        sentiment = "neutral"
+
+    pain_points: list[str] = []
+    if sentiment in {"negative", "neutral"}:
+        for label, keywords in _DEMO_PAIN_KEYWORDS.items():
+            if any(keyword in lower_text or keyword in text for keyword in keywords):
+                pain_points.append(label)
+    if sentiment == "negative" and not pain_points:
+        pain_points.append("综合体验不佳")
+
+    confidence = min(0.96, 0.62 + 0.08 * abs(pos_score - neg_score) + 0.04 * len(pain_points))
+    summary_zh = f"该评论整体偏{ {'positive': '正向', 'neutral': '中性', 'negative': '负向'}[sentiment] }，核心关注点为{('、'.join(pain_points) if pain_points else '常规体验反馈')}。"
+    summary_en = (
+        f"The review is {sentiment}; key issue: "
+        f"{(', '.join(pain_points) if pain_points else 'general customer experience')}."
+    )
+    return {
+        "sentiment": sentiment,
+        "confidence": round(confidence, 2),
+        "pain_points": pain_points,
+        "summary_zh": summary_zh,
+        "summary_en": summary_en,
+        "demo_mode": True,
+    }
+
+
+def _run_demo_batch_analysis(
+    rows: list[tuple[int, str]],
+    summary_language: str,
+    progress,
+    progress_text: str,
+    status_placeholder,
+) -> list[dict[str, Any]]:
+    total = max(1, len(rows))
+    results: list[dict[str, Any]] = []
+    for finished_count, (idx, raw_text) in enumerate(rows, start=1):
+        res = _local_analyze_review(raw_text, summary_language=summary_language)
+        results.append(
+            {
+                "index": idx,
+                "preview": str(raw_text)[:80] + ("..." if len(str(raw_text)) > 80 else ""),
+                "raw_text": str(raw_text),
+                **res,
+            }
+        )
+        progress.progress(finished_count / total, text=f"{progress_text} {finished_count}/{total}")
+        status_placeholder.caption(f"Completed: {finished_count}/{total} | Failed: 0")
+    return results
+
+
+def _generate_demo_reply_as_dict(
+    *,
+    review_text: str,
+    merchant_rules: str,
+    sentiment: str | None,
+    pain_points: list[str] | None,
+    style_hint: str | None,
+    reply_language: str,
+    knowledge_base_text: str,
+    kb_top_k: int,
+) -> dict[str, Any]:
+    kb_source = (knowledge_base_text or "").strip() or (merchant_rules or "").strip()
+    retrieved_chunks: list[str] = []
+    if kb_source:
+        hits = SimpleRAGIndex.from_text(kb_source, chunk_size=300, overlap=60).retrieve(
+            review_text,
+            top_k=kb_top_k,
+        )
+        retrieved_chunks = [hit.text for hit in hits]
+
+    points = pain_points or _local_analyze_review(review_text).get("pain_points", [])
+    if reply_language == "en":
+        reply = (
+            "Hi, thanks for sharing this with us. "
+            f"We are sorry about {', '.join(points) if points else 'the experience you mentioned'}. "
+            "We will check the order details and offer a practical next step based on the store policy."
+        )
+    else:
+        reply = (
+            "您好，感谢您把这个情况告诉我们。"
+            f"关于{('、'.join(points) if points else '您反馈的问题')}，我们已经记录并会结合订单情况核实。"
+            "我们会按店铺规则尽快给出补发、换货或售后处理方案。"
+        )
+    if style_hint:
+        reply = f"{reply}\n\n语气备注：{style_hint}"
+
+    return {
+        "reply_text": reply,
+        "provider": "demo",
+        "model": "local-template",
+        "reply_language": reply_language,
+        "used_rules": bool(kb_source),
+        "retrieved_chunks": retrieved_chunks,
+    }
 
 
 def _detect_review_column(df: pd.DataFrame) -> str | None:
@@ -148,8 +405,7 @@ def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n
     if chart_df.empty:
         return
 
-    sentiment_order = ["positive", "neutral", "negative"]
-    sentiment_counts = chart_df["sentiment"].value_counts().reindex(sentiment_order, fill_value=0).reset_index()
+    sentiment_counts = chart_df["sentiment"].value_counts().reindex(_SENTIMENT_ORDER, fill_value=0).reset_index()
     sentiment_counts.columns = ["sentiment", "count"]
 
     st.divider()
@@ -158,13 +414,13 @@ def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n
     c1, c2 = st.columns(2)
     with c1:
         bar_chart = alt.Chart(sentiment_counts).mark_bar(size=36).encode(
-            x=alt.X("sentiment:N", sort=sentiment_order, title="Sentiment", axis=alt.Axis(labelAngle=0)),
+            x=alt.X("sentiment:N", sort=_SENTIMENT_ORDER, title="Sentiment", axis=alt.Axis(labelAngle=0)),
             y=alt.Y("count:Q", title="Count"),
             color=alt.Color(
                 "sentiment:N",
                 scale=alt.Scale(
-                    domain=sentiment_order,
-                    range=["#2ecc71", "#f1c40f", "#e74c3c"],
+                    domain=_SENTIMENT_ORDER,
+                    range=_SENTIMENT_COLORS,
                 ),
                 legend=None,
             ),
@@ -178,8 +434,8 @@ def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n
             color=alt.Color(
                 "sentiment:N",
                 scale=alt.Scale(
-                    domain=sentiment_order,
-                    range=["#2ecc71", "#f1c40f", "#e74c3c"],
+                    domain=_SENTIMENT_ORDER,
+                    range=_SENTIMENT_COLORS,
                 ),
                 title="Sentiment",
             ),
@@ -217,14 +473,110 @@ def _render_sentiment_charts(res_df: pd.DataFrame, source_df: pd.DataFrame, i18n
         color=alt.Color(
             "sentiment:N",
             scale=alt.Scale(
-                domain=sentiment_order,
-                range=["#2ecc71", "#f1c40f", "#e74c3c"],
+                domain=_SENTIMENT_ORDER,
+                range=_SENTIMENT_COLORS,
             ),
             title="Sentiment",
         ),
         tooltip=["day:T", "sentiment", "count"],
     ).properties(height=360)
     st.altair_chart(line_chart, use_container_width=True)
+
+
+def _render_pain_word_cloud(pain_df: pd.DataFrame) -> None:
+    if pain_df.empty:
+        return
+
+    cloud_df = pain_df.copy().reset_index(drop=True)
+    max_count = max(int(cloud_df["count"].max()), 1)
+    cloud_df["x"] = [12 + ((i * 37) % 76) for i in range(len(cloud_df))]
+    cloud_df["y"] = [18 + ((i * 29) % 64) for i in range(len(cloud_df))]
+    cloud_df["size"] = cloud_df["count"].map(lambda x: 18 + 34 * (int(x) / max_count))
+
+    chart = alt.Chart(cloud_df).mark_text(
+        align="center",
+        baseline="middle",
+        font="sans-serif",
+        fontWeight="bold",
+    ).encode(
+        x=alt.X("x:Q", axis=None, scale=alt.Scale(domain=[0, 100])),
+        y=alt.Y("y:Q", axis=None, scale=alt.Scale(domain=[0, 100])),
+        text="pain_point:N",
+        size=alt.Size("size:Q", legend=None),
+        color=alt.Color(
+            "count:Q",
+            scale=alt.Scale(range=["#0f766e", "#2563eb", "#dc2626"]),
+            legend=None,
+        ),
+        tooltip=[
+            alt.Tooltip("pain_point:N", title="Pain Point"),
+            alt.Tooltip("count:Q", title="Count"),
+        ],
+    ).properties(height=300)
+    st.altair_chart(chart, use_container_width=True)
+
+
+def _render_pain_point_insights(res_df: pd.DataFrame | None, i18n: dict[str, str], lang: str) -> None:
+    st.subheader(i18n["insights_title"])
+
+    if not isinstance(res_df, pd.DataFrame) or res_df.empty:
+        st.info(i18n["insights_empty"])
+        return
+
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        top_k = st.slider(i18n["insights_top_k"], min_value=3, max_value=12, value=6, step=1)
+    with col_b:
+        include_neutral = st.checkbox(i18n["insights_include_neutral"], value=False)
+
+    records = _results_to_records(res_df)
+    top_points = top_pain_points_from_results(records, top_k=int(top_k), include_neutral=include_neutral)
+    analyzed_count = len(records)
+    negative_count = sum(1 for row in records if row.get("sentiment") == "negative")
+    covered_count = sum(1 for row in records if row.get("pain_points"))
+    unique_count = len({pp for row in records for pp in row.get("pain_points", [])})
+
+    metric_a, metric_b, metric_c, metric_d = st.columns(4)
+    metric_a.metric(i18n["insights_analyzed"], f"{analyzed_count:,}")
+    metric_b.metric(i18n["insights_negative"], f"{negative_count:,}")
+    metric_c.metric(i18n["insights_coverage"], f"{covered_count:,}")
+    metric_d.metric(i18n["insights_unique"], f"{unique_count:,}")
+
+    if not top_points:
+        st.info(i18n["insights_no_pain"])
+        return
+
+    pain_df = pd.DataFrame(top_points)
+    chart_left, chart_right = st.columns([1, 1])
+    with chart_left:
+        st.markdown(f"**{i18n['insights_word_cloud']}**")
+        _render_pain_word_cloud(pain_df)
+    with chart_right:
+        st.markdown(f"**{i18n['insights_top_chart']}**")
+        bar = alt.Chart(pain_df).mark_bar(cornerRadiusEnd=4).encode(
+            x=alt.X("count:Q", title="Count"),
+            y=alt.Y("pain_point:N", sort="-x", title=None),
+            color=alt.Color("count:Q", scale=alt.Scale(range=["#0f766e", "#2563eb"]), legend=None),
+            tooltip=["pain_point", "count"],
+        ).properties(height=300)
+        st.altair_chart(bar, use_container_width=True)
+
+    st.markdown(f"**{i18n['insights_defect_list']}**")
+    for rank, item in enumerate(top_points, start=1):
+        pain_point = str(item["pain_point"])
+        related = [
+            row
+            for row in records
+            if pain_point in row.get("pain_points", [])
+            and (include_neutral or row.get("sentiment") == "negative")
+        ]
+        with st.expander(f"{rank}. {pain_point} · {item['count']}", expanded=rank <= 3):
+            for sample_idx, row in enumerate(related[:4], start=1):
+                text = row.get("raw_text") or row.get("preview") or ""
+                st.write(f"{sample_idx}. {_shorten(text)}")
+                summary = _record_summary(row, lang)
+                if summary:
+                    st.caption(f"{i18n['insights_summary']}: {summary}")
 
 
 async def _run_batch_analysis(
@@ -288,9 +640,11 @@ with st.sidebar:
             "config_provider": "提供商 (Provider)",
             "config_model": "模型型号 (Model)",
             "config_summary_lang": "摘要语言 (Summary)",
+            "config_demo_mode": "演示备用模式",
             "page_title": "多模型评论情感分析系统",
             "page_subtitle": "基于大语言模型（LLM）的评论内容自动化情感分析与汇总。",
             "tab_batch": "批量分析",
+            "tab_insights": "痛点洞察",
             "tab_single": "单条评论",
             "tab_cs_chat": "模拟客服聊天",
             "expander_upload": "① 上传文件",
@@ -325,9 +679,28 @@ with st.sidebar:
             "failed_retry": "重试失败项",
             "failed_none": "当前批次无失败项。",
             "running_tip": "任务执行中，请勿重复提交。",
+            "batch_wait_upload": "等待上传数据文件。",
+            "result_table": "分析结果",
+            "insights_title": "深度痛点分析",
+            "insights_empty": "暂无批量分析结果。",
+            "insights_top_k": "Top K 痛点",
+            "insights_include_neutral": "包含中性评论",
+            "insights_analyzed": "已分析",
+            "insights_negative": "差评数",
+            "insights_coverage": "含痛点评论",
+            "insights_unique": "唯一痛点",
+            "insights_no_pain": "当前结果没有可聚合的痛点。",
+            "insights_word_cloud": "高频负面词云",
+            "insights_top_chart": "痛点排行",
+            "insights_defect_list": "核心缺陷明细",
+            "insights_summary": "AI 摘要",
             "cs_intro": "输入用户评论/提问，结合商家规则实时生成客服回复。",
             "cs_review": "用户评论 / 提问",
             "cs_rules": "商家规则（可留空）",
+            "cs_use_kb": "使用本地知识库",
+            "cs_kb_docs": "知识库文档",
+            "cs_kb_empty": "未发现本地知识库文档。",
+            "cs_retrieved_chunks": "RAG 命中文档片段",
             "cs_style": "语气偏好（可选）",
             "cs_sentiment": "情感提示（可选）",
             "cs_pain_points": "痛点关键词（可选，用逗号分隔）",
@@ -346,9 +719,11 @@ with st.sidebar:
             "config_provider": "Provider",
             "config_model": "Model",
             "config_summary_lang": "Summary Language",
+            "config_demo_mode": "Demo fallback mode",
             "page_title": "Multi-LLM Sentiment Analysis",
             "page_subtitle": "Automated review analysis dashboard powered by Large Language Models.",
             "tab_batch": "Batch Analysis",
+            "tab_insights": "Pain Insights",
             "tab_single": "Single Review",
             "tab_cs_chat": "Simulated CS Chat",
             "expander_upload": "① Upload file",
@@ -383,9 +758,28 @@ with st.sidebar:
             "failed_retry": "Retry Failed Items",
             "failed_none": "No failed items in this batch.",
             "running_tip": "A batch is running. Please avoid duplicate submissions.",
+            "batch_wait_upload": "Waiting for an uploaded data file.",
+            "result_table": "Analysis Results",
+            "insights_title": "Deep Pain Point Analysis",
+            "insights_empty": "No batch analysis results yet.",
+            "insights_top_k": "Top K Pain Points",
+            "insights_include_neutral": "Include neutral reviews",
+            "insights_analyzed": "Analyzed",
+            "insights_negative": "Negative",
+            "insights_coverage": "With Pain Points",
+            "insights_unique": "Unique Points",
+            "insights_no_pain": "No aggregate pain points in current results.",
+            "insights_word_cloud": "High-Frequency Negative Word Cloud",
+            "insights_top_chart": "Pain Point Ranking",
+            "insights_defect_list": "Core Defect Details",
+            "insights_summary": "AI Summary",
             "cs_intro": "Enter a customer review/question and generate an AI customer-service reply with merchant rules context.",
             "cs_review": "Customer review / question",
             "cs_rules": "Merchant rules (optional)",
+            "cs_use_kb": "Use local knowledge base",
+            "cs_kb_docs": "Knowledge base docs",
+            "cs_kb_empty": "No local knowledge-base docs found.",
+            "cs_retrieved_chunks": "RAG retrieved chunks",
             "cs_style": "Style hint (optional)",
             "cs_sentiment": "Sentiment hint (optional)",
             "cs_pain_points": "Pain points (optional, comma-separated)",
@@ -413,15 +807,21 @@ with st.sidebar:
             options=[d["lang_zh"], d["lang_en"]],
             index=0,
         )
+        demo_mode = st.checkbox(d["config_demo_mode"], value=False)
         summary_lang = "zh" if summary_lang_label == d["lang_zh"] else "en"
         st.session_state["llm_provider"] = p_choice.lower()
         st.session_state["llm_model"] = selected_model
         st.session_state["summary_language"] = summary_lang
+        st.session_state["demo_mode"] = demo_mode
 
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
 
-tab_batch, tab_single, tab_cs = st.tabs([d["tab_batch"], d["tab_single"], d["tab_cs_chat"]])
+_inject_demo_css()
+
+tab_batch, tab_insights, tab_single, tab_cs = st.tabs(
+    [d["tab_batch"], d["tab_insights"], d["tab_single"], d["tab_cs_chat"]]
+)
 
 with st.expander(d["expander_upload"], expanded=True):
     uploaded = st.file_uploader(d["file_uploader_label"], type=["csv", "xlsx", "xls"])
@@ -442,7 +842,7 @@ with tab_batch:
         st.info(d["running_tip"])
 
     if df is None:
-        st.info("Wait for upload...")
+        st.info(d["batch_wait_upload"])
     else:
         st.subheader(d["subheader_preview"])
         c1, c2, c3 = st.columns(3)
@@ -514,20 +914,29 @@ with tab_batch:
 
             try:
                 st.session_state[SS_BATCH_RUNNING] = True
-                service = get_llm_service(
-                    provider=st.session_state.llm_provider,
-                    model=st.session_state.llm_model,
-                )
-                results = asyncio.run(
-                    _run_batch_analysis(
-                        service,
+                if st.session_state.get("demo_mode", False):
+                    results = _run_demo_batch_analysis(
                         rows,
                         st.session_state.get("summary_language", "zh"),
                         progress,
-                        progress_text="Analyzing",
+                        progress_text="Demo analyzing",
                         status_placeholder=status_placeholder,
                     )
-                )
+                else:
+                    service = get_llm_service(
+                        provider=st.session_state.llm_provider,
+                        model=st.session_state.llm_model,
+                    )
+                    results = asyncio.run(
+                        _run_batch_analysis(
+                            service,
+                            rows,
+                            st.session_state.get("summary_language", "zh"),
+                            progress,
+                            progress_text="Analyzing",
+                            status_placeholder=status_placeholder,
+                        )
+                    )
                 res_df = pd.DataFrame(results)
                 st.session_state[SS_BATCH_RESULTS] = res_df
                 st.session_state[SS_BATCH_TEXT_COL] = col_text
@@ -543,6 +952,7 @@ with tab_batch:
 
         res_df = st.session_state.get(SS_BATCH_RESULTS)
         if isinstance(res_df, pd.DataFrame) and not res_df.empty:
+            st.subheader(d["result_table"])
             st.dataframe(res_df.drop(columns=["raw_text"], errors="ignore"), use_container_width=True)
 
             failed_df = st.session_state.get(SS_BATCH_FAILED)
@@ -559,20 +969,29 @@ with tab_batch:
                     status_placeholder = st.empty()
                     try:
                         st.session_state[SS_BATCH_RUNNING] = True
-                        service = get_llm_service(
-                            provider=st.session_state.llm_provider,
-                            model=st.session_state.llm_model,
-                        )
-                        retried = asyncio.run(
-                            _run_batch_analysis(
-                                service,
+                        if st.session_state.get("demo_mode", False):
+                            retried = _run_demo_batch_analysis(
                                 retry_rows,
                                 st.session_state.get("summary_language", "zh"),
                                 progress,
                                 progress_text="Retrying",
                                 status_placeholder=status_placeholder,
                             )
-                        )
+                        else:
+                            service = get_llm_service(
+                                provider=st.session_state.llm_provider,
+                                model=st.session_state.llm_model,
+                            )
+                            retried = asyncio.run(
+                                _run_batch_analysis(
+                                    service,
+                                    retry_rows,
+                                    st.session_state.get("summary_language", "zh"),
+                                    progress,
+                                    progress_text="Retrying",
+                                    status_placeholder=status_placeholder,
+                                )
+                            )
                         retry_df = pd.DataFrame(retried)
 
                         merged = pd.concat(
@@ -596,6 +1015,9 @@ with tab_batch:
 
             _render_sentiment_charts(res_df, df, d)
 
+with tab_insights:
+    _render_pain_point_insights(st.session_state.get(SS_BATCH_RESULTS), d, lang)
+
 with tab_single:
     st.subheader(d["subheader_single"])
     text_input = st.text_area(d["label_text"], height=150)
@@ -605,10 +1027,6 @@ with tab_single:
         else:
             with st.spinner(d["spinner_calling"]):
                 try:
-                    service = get_llm_service(
-                        provider=st.session_state.llm_provider,
-                        model=st.session_state.llm_model,
-                    )
                     single_lang = (
                         "en"
                         if _should_reply_in_english(
@@ -617,10 +1035,17 @@ with tab_single:
                         )
                         else "zh"
                     )
-                    res = service.analyze_review_as_dict(
-                        text_input.strip(),
-                        summary_language=single_lang,
-                    )
+                    if st.session_state.get("demo_mode", False):
+                        res = _local_analyze_review(text_input.strip(), summary_language=single_lang)
+                    else:
+                        service = get_llm_service(
+                            provider=st.session_state.llm_provider,
+                            model=st.session_state.llm_model,
+                        )
+                        res = service.analyze_review_as_dict(
+                            text_input.strip(),
+                            summary_language=single_lang,
+                        )
                     st.success(d["success_done"])
                     st.json(res)
                 except Exception as exc:
@@ -636,6 +1061,22 @@ with tab_cs:
     with st.expander("Context / 上下文", expanded=True):
         review_text = st.text_area(d["cs_review"], height=120, key="cs_review_text")
         merchant_rules = st.text_area(d["cs_rules"], height=120, key="cs_rules_text")
+        kb_files = _available_kb_files(lang)
+        use_kb = st.checkbox(d["cs_use_kb"], value=True, disabled=not kb_files)
+        if kb_files:
+            default_kb = [p.name for p in kb_files[:2]]
+            selected_kb_names = st.multiselect(
+                d["cs_kb_docs"],
+                options=[p.name for p in kb_files],
+                default=default_kb,
+                disabled=not use_kb,
+                key="cs_kb_docs",
+            )
+            selected_kb_paths = [p for p in kb_files if p.name in selected_kb_names]
+            knowledge_base_text = _read_kb_files(selected_kb_paths) if use_kb else ""
+        else:
+            st.caption(d["cs_kb_empty"])
+            knowledge_base_text = ""
         col_a, col_b = st.columns(2)
         with col_a:
             style_hint = st.text_input(d["cs_style"], key="cs_style_hint")
@@ -665,23 +1106,39 @@ with tab_cs:
             pain_points = [x.strip() for x in pain_points_raw.split(",") if x.strip()] if pain_points_raw else None
             with st.spinner(d["cs_thinking"]):
                 try:
-                    res = generate_customer_service_reply_as_dict(
-                        review_text=review_text.strip(),
-                        merchant_rules=merchant_rules.strip(),
-                        provider=st.session_state.get("llm_provider", "deepseek"),
-                        model=st.session_state.get("llm_model") or None,
-                        sentiment=sentiment_hint or None,
-                        pain_points=pain_points,
-                        style_hint=style_hint.strip() or None,
-                        reply_language=(
-                            "en"
-                            if _should_reply_in_english(
-                                st.session_state.get("summary_language", "zh"),
-                                review_text,
-                            )
-                            else "zh"
-                        ),
+                    reply_language = (
+                        "en"
+                        if _should_reply_in_english(
+                            st.session_state.get("summary_language", "zh"),
+                            review_text,
+                        )
+                        else "zh"
                     )
+                    if st.session_state.get("demo_mode", False):
+                        res = _generate_demo_reply_as_dict(
+                            review_text=review_text.strip(),
+                            merchant_rules=merchant_rules.strip(),
+                            sentiment=sentiment_hint or None,
+                            pain_points=pain_points,
+                            style_hint=style_hint.strip() or None,
+                            reply_language=reply_language,
+                            knowledge_base_text=knowledge_base_text,
+                            kb_top_k=3,
+                        )
+                    else:
+                        res = generate_customer_service_reply_as_dict(
+                            review_text=review_text.strip(),
+                            merchant_rules=merchant_rules.strip(),
+                            provider=st.session_state.get("llm_provider", "deepseek"),
+                            model=st.session_state.get("llm_model") or None,
+                            sentiment=sentiment_hint or None,
+                            pain_points=pain_points,
+                            style_hint=style_hint.strip() or None,
+                            reply_language=reply_language,
+                            knowledge_base_text=knowledge_base_text,
+                            kb_top_k=3,
+                        )
+                    used_rules = bool(res.get("used_rules") or knowledge_base_text.strip())
                     st.session_state[SS_CS_CHAT_HISTORY].append(
                         {
                             "review_text": review_text.strip(),
@@ -689,8 +1146,9 @@ with tab_cs:
                             "meta": d["cs_meta"].format(
                                 provider=res.get("provider", "-"),
                                 model=res.get("model", "-"),
-                                used_rules=res.get("used_rules", False),
+                                used_rules=used_rules,
                             ),
+                            "retrieved_chunks": res.get("retrieved_chunks", []),
                         }
                     )
                     st.rerun()
@@ -703,3 +1161,8 @@ with tab_cs:
         with st.chat_message("assistant"):
             st.write(item["reply_text"])
             st.caption(item["meta"])
+            chunks = item.get("retrieved_chunks") or []
+            if chunks:
+                with st.expander(d["cs_retrieved_chunks"], expanded=False):
+                    for idx, chunk in enumerate(chunks, start=1):
+                        st.write(f"{idx}. {_shorten(chunk, 320)}")
