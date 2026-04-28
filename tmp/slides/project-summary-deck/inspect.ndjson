@@ -1,0 +1,256 @@
+{"kind":"deck","id":"project-summary-deck","slideCount":6,"slideSize":{"width":1280,"height":720}}
+{"kind":"slide","slide":1,"id":"492gjh"}
+{"kind":"slide","slide":2,"id":"16xrji"}
+{"kind":"slide","slide":3,"id":"spvskd"}
+{"kind":"slide","slide":4,"id":"2yc0zj"}
+{"kind":"slide","slide":5,"id":"xqzujv"}
+{"kind":"slide","slide":6,"id":"336zyb"}
+{"kind":"shape","slide":1,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":1,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":1,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":1,"id":"5","role":"hero panel","shapeType":"roundRect","bbox":[70,82,660,490]}
+{"kind":"shape","slide":1,"id":"6","role":"hero accent","shapeType":"rect","bbox":[70,82,660,10]}
+{"kind":"shape","slide":1,"id":"7","role":"cover kicker","shapeType":"rect","bbox":[96,118,200,22]}
+{"kind":"textbox","slide":1,"id":"7","role":"cover kicker","text":"MIDTERM REPORT","textChars":14,"textLines":1,"bbox":[96,118,200,22]}
+{"kind":"shape","slide":1,"id":"8","role":"cover title","shapeType":"rect","bbox":[96,156,590,150]}
+{"kind":"textbox","slide":1,"id":"8","role":"cover title","text":"Automated Customer Service & Review Sentiment Analysis System","textChars":61,"textLines":1,"bbox":[96,156,590,150]}
+{"kind":"shape","slide":1,"id":"9","role":"cover subtitle","shapeType":"rect","bbox":[98,320,560,72]}
+{"kind":"textbox","slide":1,"id":"9","role":"cover subtitle","text":"An AI-driven SaaS concept that reduces support cost and turns raw reviews into actionable business insight.","textChars":107,"textLines":1,"bbox":[98,320,560,72]}
+{"kind":"shape","slide":1,"id":"10","role":"value callout","shapeType":"roundRect","bbox":[98,428,270,94]}
+{"kind":"shape","slide":1,"id":"11","role":"callout label","shapeType":"rect","bbox":[120,448,120,18]}
+{"kind":"textbox","slide":1,"id":"11","role":"callout label","text":"Core Value","textChars":10,"textLines":1,"bbox":[120,448,120,18]}
+{"kind":"shape","slide":1,"id":"12","role":"callout body","shapeType":"rect","bbox":[120,472,220,42]}
+{"kind":"textbox","slide":1,"id":"12","role":"callout body","text":"Lower support cost and surface product issues from reviews.","textChars":59,"textLines":1,"bbox":[120,472,220,42]}
+{"kind":"shape","slide":1,"id":"13","role":"summary panel","shapeType":"roundRect","bbox":[780,104,400,472]}
+{"kind":"shape","slide":1,"id":"14","role":"snapshot title","shapeType":"rect","bbox":[814,132,190,28]}
+{"kind":"textbox","slide":1,"id":"14","role":"snapshot title","text":"Project Snapshot","textChars":16,"textLines":1,"bbox":[814,132,190,28]}
+{"kind":"shape","slide":1,"id":"15","role":"snapshot label 1","shapeType":"rect","bbox":[814,190,160,20]}
+{"kind":"textbox","slide":1,"id":"15","role":"snapshot label 1","text":"Two linked modules","textChars":18,"textLines":1,"bbox":[814,190,160,20]}
+{"kind":"shape","slide":1,"id":"16","role":"snapshot body 1","shapeType":"rect","bbox":[814,216,300,62]}
+{"kind":"textbox","slide":1,"id":"16","role":"snapshot body 1","text":"1. Merchant-style assistant\n2. Review sentiment analytics","textChars":57,"textLines":2,"bbox":[814,216,300,62]}
+{"kind":"shape","slide":1,"id":"17","role":"snapshot label 2","shapeType":"rect","bbox":[814,314,140,20]}
+{"kind":"textbox","slide":1,"id":"17","role":"snapshot label 2","text":"Current status","textChars":14,"textLines":1,"bbox":[814,314,140,20]}
+{"kind":"shape","slide":1,"id":"18","role":"snapshot body 2","shapeType":"rect","bbox":[814,340,308,70]}
+{"kind":"textbox","slide":1,"id":"18","role":"snapshot body 2","text":"MVP completed.\nAbout 50% overall progress.\nNow entering RAG integration.","textChars":72,"textLines":3,"bbox":[814,340,308,70]}
+{"kind":"shape","slide":1,"id":"19","role":"snapshot label 3","shapeType":"rect","bbox":[814,426,120,20]}
+{"kind":"textbox","slide":1,"id":"19","role":"snapshot label 3","text":"Key stack","textChars":9,"textLines":1,"bbox":[814,426,120,20]}
+{"kind":"shape","slide":1,"id":"20","role":"snapshot body 3","shapeType":"rect","bbox":[814,452,308,96]}
+{"kind":"textbox","slide":1,"id":"20","role":"snapshot body 3","text":"Streamlit\nPandas\nGemini / DeepSeek\nRAG / vector database","textChars":56,"textLines":4,"bbox":[814,452,308,96]}
+{"kind":"shape","slide":1,"id":"21","role":"footer team","shapeType":"rect","bbox":[70,654,760,18]}
+{"kind":"textbox","slide":1,"id":"21","role":"footer team","text":"LIU DEZHENG  |  LIU JIACHENG  |  ZHENG WENBIN  |  JI TENGFEI","textChars":60,"textLines":1,"bbox":[70,654,760,18]}
+{"kind":"shape","slide":2,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":2,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":2,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":2,"id":"5","role":"section label","shapeType":"rect","bbox":[70,42,360,24]}
+{"kind":"textbox","slide":2,"id":"5","role":"section label","text":"WHY NOW","textChars":7,"textLines":1,"bbox":[70,42,360,24]}
+{"kind":"shape","slide":2,"id":"6","role":"page number","shapeType":"rect","bbox":[1120,42,90,24]}
+{"kind":"textbox","slide":2,"id":"6","role":"page number","text":"02 / 06","textChars":7,"textLines":1,"bbox":[1120,42,90,24]}
+{"kind":"shape","slide":2,"id":"7","role":"header rule","shapeType":"rect","bbox":[70,68,1140,2]}
+{"kind":"shape","slide":2,"id":"8","role":"header marker","shapeType":"ellipse","bbox":[60,58,18,18]}
+{"kind":"shape","slide":2,"id":"9","role":"title","shapeType":"rect","bbox":[70,96,860,96]}
+{"kind":"textbox","slide":2,"id":"9","role":"title","text":"The pain point is operational overload for small sellers","textChars":56,"textLines":1,"bbox":[70,96,860,96]}
+{"kind":"shape","slide":2,"id":"10","role":"subtitle","shapeType":"rect","bbox":[72,184,860,54]}
+{"kind":"textbox","slide":2,"id":"10","role":"subtitle","text":"Our project targets the gap between large volumes of inquiries and the limited ability to analyze product feedback.","textChars":115,"textLines":1,"bbox":[72,184,860,54]}
+{"kind":"shape","slide":2,"id":"11","role":"card Business Pain","shapeType":"roundRect","bbox":[70,248,360,260]}
+{"kind":"shape","slide":2,"id":"12","role":"card accent Business Pain","shapeType":"rect","bbox":[70,248,360,8]}
+{"kind":"shape","slide":2,"id":"13","role":"card heading Business Pain","shapeType":"rect","bbox":[92,268,316,42]}
+{"kind":"textbox","slide":2,"id":"13","role":"card heading Business Pain","text":"Business Pain","textChars":13,"textLines":1,"bbox":[92,268,316,42]}
+{"kind":"shape","slide":2,"id":"14","role":"card body Business Pain","shapeType":"rect","bbox":[94,328,312,158]}
+{"kind":"textbox","slide":2,"id":"14","role":"card body Business Pain","text":"• Too many repetitive customer\ninquiries.\n• Too little capacity to read\nlarge review sets.\n• Slow support and weak\nvisibility into product\nissues.","textChars":146,"textLines":7,"bbox":[94,328,312,158]}
+{"kind":"shape","slide":2,"id":"15","role":"card Opportunity","shapeType":"roundRect","bbox":[460,248,360,260]}
+{"kind":"shape","slide":2,"id":"16","role":"card accent Opportunity","shapeType":"rect","bbox":[460,248,360,8]}
+{"kind":"shape","slide":2,"id":"17","role":"card heading Opportunity","shapeType":"rect","bbox":[482,268,316,42]}
+{"kind":"textbox","slide":2,"id":"17","role":"card heading Opportunity","text":"Opportunity","textChars":11,"textLines":1,"bbox":[482,268,316,42]}
+{"kind":"shape","slide":2,"id":"18","role":"card body Opportunity","shapeType":"rect","bbox":[484,328,312,158]}
+{"kind":"textbox","slide":2,"id":"18","role":"card body Opportunity","text":"• Automate routine support while\npreserving merchant tone.\n• Use sentiment analysis to\nexpose defect and return-risk\npatterns.\n• Offer a lightweight SaaS tool\nfor smaller seller teams.","textChars":184,"textLines":7,"bbox":[484,328,312,158]}
+{"kind":"shape","slide":2,"id":"19","role":"impact panel","shapeType":"roundRect","bbox":[850,248,360,260]}
+{"kind":"shape","slide":2,"id":"20","role":"impact title","shapeType":"rect","bbox":[878,274,220,28]}
+{"kind":"textbox","slide":2,"id":"20","role":"impact title","text":"Why this matters","textChars":16,"textLines":1,"bbox":[878,274,220,28]}
+{"kind":"shape","slide":2,"id":"21","role":"impact intro","shapeType":"rect","bbox":[878,320,284,44]}
+{"kind":"textbox","slide":2,"id":"21","role":"impact intro","text":"Support automation + review mining creates a clear business loop:","textChars":65,"textLines":1,"bbox":[878,320,284,44]}
+{"kind":"shape","slide":2,"id":"22","role":"impact bullets","shapeType":"rect","bbox":[878,374,230,112]}
+{"kind":"textbox","slide":2,"id":"22","role":"impact bullets","text":"• faster response\n• clearer defect discovery\n• better iteration\n• lower after-sales loss","textChars":88,"textLines":4,"bbox":[878,374,230,112]}
+{"kind":"shape","slide":2,"id":"23","role":"impact close","shapeType":"rect","bbox":[878,500,250,48]}
+{"kind":"textbox","slide":2,"id":"23","role":"impact close","text":"This project turns technical capability into visible commercial value.","textChars":70,"textLines":1,"bbox":[878,500,250,48]}
+{"kind":"shape","slide":3,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":3,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":3,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":3,"id":"5","role":"section label","shapeType":"rect","bbox":[70,42,360,24]}
+{"kind":"textbox","slide":3,"id":"5","role":"section label","text":"SYSTEM DESIGN","textChars":13,"textLines":1,"bbox":[70,42,360,24]}
+{"kind":"shape","slide":3,"id":"6","role":"page number","shapeType":"rect","bbox":[1120,42,90,24]}
+{"kind":"textbox","slide":3,"id":"6","role":"page number","text":"03 / 06","textChars":7,"textLines":1,"bbox":[1120,42,90,24]}
+{"kind":"shape","slide":3,"id":"7","role":"header rule","shapeType":"rect","bbox":[70,68,1140,2]}
+{"kind":"shape","slide":3,"id":"8","role":"header marker","shapeType":"ellipse","bbox":[60,58,18,18]}
+{"kind":"shape","slide":3,"id":"9","role":"title","shapeType":"rect","bbox":[70,96,920,96]}
+{"kind":"textbox","slide":3,"id":"9","role":"title","text":"A dual-engine workflow connects service automation with insight generation","textChars":74,"textLines":1,"bbox":[70,96,920,96]}
+{"kind":"shape","slide":3,"id":"10","role":"subtitle","shapeType":"rect","bbox":[72,184,860,54]}
+{"kind":"textbox","slide":3,"id":"10","role":"subtitle","text":"The solution combines a merchant-aligned customer assistant with an analytics pipeline built on LLMs, prompts, and retrieval.","textChars":125,"textLines":1,"bbox":[72,184,860,54]}
+{"kind":"shape","slide":3,"id":"11","role":"card Module A: Customer Service","shapeType":"roundRect","bbox":[70,242,348,280]}
+{"kind":"shape","slide":3,"id":"12","role":"card accent Module A: Customer Service","shapeType":"rect","bbox":[70,242,348,8]}
+{"kind":"shape","slide":3,"id":"13","role":"card heading Module A: Customer Service","shapeType":"rect","bbox":[92,262,304,42]}
+{"kind":"textbox","slide":3,"id":"13","role":"card heading Module A: Customer Service","text":"Module A: Customer Service","textChars":26,"textLines":1,"bbox":[92,262,304,42]}
+{"kind":"shape","slide":3,"id":"14","role":"card body Module A: Customer Service","shapeType":"rect","bbox":[94,322,300,178]}
+{"kind":"textbox","slide":3,"id":"14","role":"card body Module A: Customer Service","text":"• Matches merchant tone and\napplies return rules.\n• Uses prompts and later RAG\nretrieval for more consistent\nanswers.\n• Goal: faster service with\nfewer handoffs.","textChars":161,"textLines":7,"bbox":[94,322,300,178]}
+{"kind":"shape","slide":3,"id":"15","role":"card Module B: Sentiment Analysis","shapeType":"roundRect","bbox":[466,242,348,280]}
+{"kind":"shape","slide":3,"id":"16","role":"card accent Module B: Sentiment Analysis","shapeType":"rect","bbox":[466,242,348,8]}
+{"kind":"shape","slide":3,"id":"17","role":"card heading Module B: Sentiment Analysis","shapeType":"rect","bbox":[488,262,304,42]}
+{"kind":"textbox","slide":3,"id":"17","role":"card heading Module B: Sentiment Analysis","text":"Module B: Sentiment Analysis","textChars":28,"textLines":1,"bbox":[488,262,304,42]}
+{"kind":"shape","slide":3,"id":"18","role":"card body Module B: Sentiment Analysis","shapeType":"rect","bbox":[490,322,300,178]}
+{"kind":"textbox","slide":3,"id":"18","role":"card body Module B: Sentiment Analysis","text":"• Classifies review sentiment\nand summarizes pain points.\n• Turns raw feedback into charts\nand business insight.\n• Goal: make iteration more\ndata-driven.","textChars":153,"textLines":6,"bbox":[490,322,300,178]}
+{"kind":"shape","slide":3,"id":"19","role":"stack panel","shapeType":"roundRect","bbox":[862,242,348,280]}
+{"kind":"shape","slide":3,"id":"20","role":"stack title","shapeType":"rect","bbox":[886,266,220,28]}
+{"kind":"textbox","slide":3,"id":"20","role":"stack title","text":"Implementation Stack","textChars":20,"textLines":1,"bbox":[886,266,220,28]}
+{"kind":"shape","slide":3,"id":"21","role":"stack label 1","shapeType":"rect","bbox":[886,314,80,18]}
+{"kind":"textbox","slide":3,"id":"21","role":"stack label 1","text":"Frontend","textChars":8,"textLines":1,"bbox":[886,314,80,18]}
+{"kind":"shape","slide":3,"id":"22","role":"stack body 1","shapeType":"rect","bbox":[886,336,240,40]}
+{"kind":"textbox","slide":3,"id":"22","role":"stack body 1","text":"Python, Streamlit,\nAltair, Pandas","textChars":33,"textLines":2,"bbox":[886,336,240,40]}
+{"kind":"shape","slide":3,"id":"23","role":"stack label 2","shapeType":"rect","bbox":[886,376,80,18]}
+{"kind":"textbox","slide":3,"id":"23","role":"stack label 2","text":"Backend","textChars":7,"textLines":1,"bbox":[886,376,80,18]}
+{"kind":"shape","slide":3,"id":"24","role":"stack body 2","shapeType":"rect","bbox":[886,398,280,44]}
+{"kind":"textbox","slide":3,"id":"24","role":"stack body 2","text":"Python, asyncio, httpx\nfor high-concurrency requests","textChars":52,"textLines":2,"bbox":[886,398,280,44]}
+{"kind":"shape","slide":3,"id":"25","role":"stack label 3","shapeType":"rect","bbox":[886,448,110,18]}
+{"kind":"textbox","slide":3,"id":"25","role":"stack label 3","text":"AI + Retrieval","textChars":14,"textLines":1,"bbox":[886,448,110,18]}
+{"kind":"shape","slide":3,"id":"26","role":"stack body 3","shapeType":"rect","bbox":[886,470,280,74]}
+{"kind":"textbox","slide":3,"id":"26","role":"stack body 3","text":"Gemini, DeepSeek,\nprompt engineering,\nRAG / vector database","textChars":59,"textLines":3,"bbox":[886,470,280,74]}
+{"kind":"shape","slide":4,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":4,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":4,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":4,"id":"5","role":"section label","shapeType":"rect","bbox":[70,42,360,24]}
+{"kind":"textbox","slide":4,"id":"5","role":"section label","text":"PROTOTYPE","textChars":9,"textLines":1,"bbox":[70,42,360,24]}
+{"kind":"shape","slide":4,"id":"6","role":"page number","shapeType":"rect","bbox":[1120,42,90,24]}
+{"kind":"textbox","slide":4,"id":"6","role":"page number","text":"04 / 06","textChars":7,"textLines":1,"bbox":[1120,42,90,24]}
+{"kind":"shape","slide":4,"id":"7","role":"header rule","shapeType":"rect","bbox":[70,68,1140,2]}
+{"kind":"shape","slide":4,"id":"8","role":"header marker","shapeType":"ellipse","bbox":[60,58,18,18]}
+{"kind":"shape","slide":4,"id":"9","role":"title","shapeType":"rect","bbox":[70,96,860,96]}
+{"kind":"textbox","slide":4,"id":"9","role":"title","text":"The current prototype already covers the end-user workflow","textChars":58,"textLines":1,"bbox":[70,96,860,96]}
+{"kind":"shape","slide":4,"id":"10","role":"subtitle","shapeType":"rect","bbox":[72,184,860,54]}
+{"kind":"textbox","slide":4,"id":"10","role":"subtitle","text":"Two interface views show the interaction flow and the analytics-oriented frontend experience.","textChars":93,"textLines":1,"bbox":[72,184,860,54]}
+{"kind":"shape","slide":4,"id":"11","role":"prototype frame 1","shapeType":"roundRect","bbox":[70,236,540,360]}
+{"kind":"shape","slide":4,"id":"12","role":"prototype frame 2","shapeType":"roundRect","bbox":[670,236,540,360]}
+{"kind":"image","slide":4,"id":"13","role":"prototype image 1","path":"E:\\work\\bs\\Automated customer service and comment sentiment analysis tools\\原型图片.png","bbox":[92,258,496,286]}
+{"kind":"image","slide":4,"id":"14","role":"prototype image 2","path":"E:\\work\\bs\\Automated customer service and comment sentiment analysis tools\\原型图片2.png","bbox":[692,258,496,286]}
+{"kind":"shape","slide":4,"id":"15","role":"proto label 1","shapeType":"rect","bbox":[92,558,150,20]}
+{"kind":"textbox","slide":4,"id":"15","role":"proto label 1","text":"Prototype View A","textChars":16,"textLines":1,"bbox":[92,558,150,20]}
+{"kind":"shape","slide":4,"id":"16","role":"proto caption 1","shapeType":"rect","bbox":[92,582,420,28]}
+{"kind":"textbox","slide":4,"id":"16","role":"proto caption 1","text":"Shows the main interaction flow.","textChars":32,"textLines":1,"bbox":[92,582,420,28]}
+{"kind":"shape","slide":4,"id":"17","role":"proto label 2","shapeType":"rect","bbox":[692,558,150,20]}
+{"kind":"textbox","slide":4,"id":"17","role":"proto label 2","text":"Prototype View B","textChars":16,"textLines":1,"bbox":[692,558,150,20]}
+{"kind":"shape","slide":4,"id":"18","role":"proto caption 2","shapeType":"rect","bbox":[692,582,430,28]}
+{"kind":"textbox","slide":4,"id":"18","role":"proto caption 2","text":"Shows the analytics-oriented frontend.","textChars":38,"textLines":1,"bbox":[692,582,430,28]}
+{"kind":"shape","slide":5,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":5,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":5,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":5,"id":"5","role":"section label","shapeType":"rect","bbox":[70,42,360,24]}
+{"kind":"textbox","slide":5,"id":"5","role":"section label","text":"PROGRESS","textChars":8,"textLines":1,"bbox":[70,42,360,24]}
+{"kind":"shape","slide":5,"id":"6","role":"page number","shapeType":"rect","bbox":[1120,42,90,24]}
+{"kind":"textbox","slide":5,"id":"6","role":"page number","text":"05 / 06","textChars":7,"textLines":1,"bbox":[1120,42,90,24]}
+{"kind":"shape","slide":5,"id":"7","role":"header rule","shapeType":"rect","bbox":[70,68,1140,2]}
+{"kind":"shape","slide":5,"id":"8","role":"header marker","shapeType":"ellipse","bbox":[60,58,18,18]}
+{"kind":"shape","slide":5,"id":"9","role":"title","shapeType":"rect","bbox":[70,96,890,96]}
+{"kind":"textbox","slide":5,"id":"9","role":"title","text":"The team has reached the MVP stage with measurable progress","textChars":59,"textLines":1,"bbox":[70,96,890,96]}
+{"kind":"shape","slide":5,"id":"10","role":"subtitle","shapeType":"rect","bbox":[72,184,860,54]}
+{"kind":"textbox","slide":5,"id":"10","role":"subtitle","text":"We have working prompts, concurrency handling, a golden dataset, and a usable UI while preparing the formal RAG layer.","textChars":118,"textLines":1,"bbox":[72,184,860,54]}
+{"kind":"shape","slide":5,"id":"11","role":"metric Overall progress","shapeType":"roundRect","bbox":[70,240,210,150]}
+{"kind":"shape","slide":5,"id":"12","role":"metric accent Overall progress","shapeType":"rect","bbox":[70,240,210,7]}
+{"kind":"shape","slide":5,"id":"13","role":"metric value Overall progress","shapeType":"rect","bbox":[90,262,170,42]}
+{"kind":"textbox","slide":5,"id":"13","role":"metric value Overall progress","text":"50%","textChars":3,"textLines":1,"bbox":[90,262,170,42]}
+{"kind":"shape","slide":5,"id":"14","role":"metric label Overall progress","shapeType":"rect","bbox":[90,310,170,26]}
+{"kind":"textbox","slide":5,"id":"14","role":"metric label Overall progress","text":"Overall progress","textChars":16,"textLines":1,"bbox":[90,310,170,26]}
+{"kind":"shape","slide":5,"id":"15","role":"metric note Overall progress","shapeType":"rect","bbox":[90,346,170,34]}
+{"kind":"textbox","slide":5,"id":"15","role":"metric note Overall progress","text":"Stages 1-2 completed","textChars":20,"textLines":1,"bbox":[90,346,170,34]}
+{"kind":"shape","slide":5,"id":"16","role":"metric Golden dataset","shapeType":"roundRect","bbox":[300,240,210,150]}
+{"kind":"shape","slide":5,"id":"17","role":"metric accent Golden dataset","shapeType":"rect","bbox":[300,240,210,7]}
+{"kind":"shape","slide":5,"id":"18","role":"metric value Golden dataset","shapeType":"rect","bbox":[320,262,170,42]}
+{"kind":"textbox","slide":5,"id":"18","role":"metric value Golden dataset","text":"200","textChars":3,"textLines":1,"bbox":[320,262,170,42]}
+{"kind":"shape","slide":5,"id":"19","role":"metric label Golden dataset","shapeType":"rect","bbox":[320,310,170,26]}
+{"kind":"textbox","slide":5,"id":"19","role":"metric label Golden dataset","text":"Golden dataset","textChars":14,"textLines":1,"bbox":[320,310,170,26]}
+{"kind":"shape","slide":5,"id":"20","role":"metric note Golden dataset","shapeType":"rect","bbox":[320,346,170,34]}
+{"kind":"textbox","slide":5,"id":"20","role":"metric note Golden dataset","text":"Validation set ready","textChars":20,"textLines":1,"bbox":[320,346,170,34]}
+{"kind":"shape","slide":5,"id":"21","role":"metric Sentiment accuracy","shapeType":"roundRect","bbox":[530,240,210,150]}
+{"kind":"shape","slide":5,"id":"22","role":"metric accent Sentiment accuracy","shapeType":"rect","bbox":[530,240,210,7]}
+{"kind":"shape","slide":5,"id":"23","role":"metric value Sentiment accuracy","shapeType":"rect","bbox":[550,262,170,42]}
+{"kind":"textbox","slide":5,"id":"23","role":"metric value Sentiment accuracy","text":"80%+","textChars":4,"textLines":1,"bbox":[550,262,170,42]}
+{"kind":"shape","slide":5,"id":"24","role":"metric label Sentiment accuracy","shapeType":"rect","bbox":[550,310,170,26]}
+{"kind":"textbox","slide":5,"id":"24","role":"metric label Sentiment accuracy","text":"Sentiment accuracy","textChars":18,"textLines":1,"bbox":[550,310,170,26]}
+{"kind":"shape","slide":5,"id":"25","role":"metric note Sentiment accuracy","shapeType":"rect","bbox":[550,346,170,34]}
+{"kind":"textbox","slide":5,"id":"25","role":"metric note Sentiment accuracy","text":"V2.0 prompt result","textChars":18,"textLines":1,"bbox":[550,346,170,34]}
+{"kind":"shape","slide":5,"id":"26","role":"progress note","shapeType":"roundRect","bbox":[770,240,440,150]}
+{"kind":"shape","slide":5,"id":"27","role":"milestone title","shapeType":"rect","bbox":[796,266,180,24]}
+{"kind":"textbox","slide":5,"id":"27","role":"milestone title","text":"Current milestone","textChars":17,"textLines":1,"bbox":[796,266,180,24]}
+{"kind":"shape","slide":5,"id":"28","role":"milestone body","shapeType":"rect","bbox":[796,306,360,74]}
+{"kind":"textbox","slide":5,"id":"28","role":"milestone body","text":"Rate-limit handling, merchant tone cloning, and the UI mockup are done.\nThe team is now moving into scalable RAG integration.","textChars":125,"textLines":2,"bbox":[796,306,360,74]}
+{"kind":"shape","slide":5,"id":"29","role":"team LIU DEZHENG","shapeType":"roundRect","bbox":[70,430,270,184]}
+{"kind":"shape","slide":5,"id":"30","role":"team marker LIU DEZHENG","shapeType":"ellipse","bbox":[88,446,12,12]}
+{"kind":"shape","slide":5,"id":"31","role":"team name LIU DEZHENG","shapeType":"rect","bbox":[110,442,216,22]}
+{"kind":"textbox","slide":5,"id":"31","role":"team name LIU DEZHENG","text":"LIU DEZHENG","textChars":11,"textLines":1,"bbox":[110,442,216,22]}
+{"kind":"shape","slide":5,"id":"32","role":"team role LIU DEZHENG","shapeType":"rect","bbox":[110,464,216,20]}
+{"kind":"textbox","slide":5,"id":"32","role":"team role LIU DEZHENG","text":"Backend Developer","textChars":17,"textLines":1,"bbox":[110,464,216,20]}
+{"kind":"shape","slide":5,"id":"33","role":"team body LIU DEZHENG","shapeType":"rect","bbox":[88,496,234,102]}
+{"kind":"textbox","slide":5,"id":"33","role":"team body LIU DEZHENG","text":"System architecture, Gemini\nand DeepSeek integration,\nand concurrency controls.","textChars":79,"textLines":3,"bbox":[88,496,234,102]}
+{"kind":"shape","slide":5,"id":"34","role":"team LIU JIACHENG","shapeType":"roundRect","bbox":[360,430,270,184]}
+{"kind":"shape","slide":5,"id":"35","role":"team marker LIU JIACHENG","shapeType":"ellipse","bbox":[378,446,12,12]}
+{"kind":"shape","slide":5,"id":"36","role":"team name LIU JIACHENG","shapeType":"rect","bbox":[400,442,216,22]}
+{"kind":"textbox","slide":5,"id":"36","role":"team name LIU JIACHENG","text":"LIU JIACHENG","textChars":12,"textLines":1,"bbox":[400,442,216,22]}
+{"kind":"shape","slide":5,"id":"37","role":"team role LIU JIACHENG","shapeType":"rect","bbox":[400,464,216,20]}
+{"kind":"textbox","slide":5,"id":"37","role":"team role LIU JIACHENG","text":"Frontend Developer","textChars":18,"textLines":1,"bbox":[400,464,216,20]}
+{"kind":"shape","slide":5,"id":"38","role":"team body LIU JIACHENG","shapeType":"rect","bbox":[378,496,234,102]}
+{"kind":"textbox","slide":5,"id":"38","role":"team body LIU JIACHENG","text":"Streamlit interface, Pandas\ncleaning, and\nbusiness-facing charts.","textChars":65,"textLines":3,"bbox":[378,496,234,102]}
+{"kind":"shape","slide":5,"id":"39","role":"team ZHENG WENBIN","shapeType":"roundRect","bbox":[650,430,270,184]}
+{"kind":"shape","slide":5,"id":"40","role":"team marker ZHENG WENBIN","shapeType":"ellipse","bbox":[668,446,12,12]}
+{"kind":"shape","slide":5,"id":"41","role":"team name ZHENG WENBIN","shapeType":"rect","bbox":[690,442,216,22]}
+{"kind":"textbox","slide":5,"id":"41","role":"team name ZHENG WENBIN","text":"ZHENG WENBIN","textChars":12,"textLines":1,"bbox":[690,442,216,22]}
+{"kind":"shape","slide":5,"id":"42","role":"team role ZHENG WENBIN","shapeType":"rect","bbox":[690,464,216,20]}
+{"kind":"textbox","slide":5,"id":"42","role":"team role ZHENG WENBIN","text":"Prompt Engineer & Tester","textChars":24,"textLines":1,"bbox":[690,464,216,20]}
+{"kind":"shape","slide":5,"id":"43","role":"team body ZHENG WENBIN","shapeType":"rect","bbox":[668,496,234,102]}
+{"kind":"textbox","slide":5,"id":"43","role":"team body ZHENG WENBIN","text":"Prompt iteration, validation\ndatasets, and defensive\nprompting.","textChars":63,"textLines":3,"bbox":[668,496,234,102]}
+{"kind":"shape","slide":5,"id":"44","role":"team JI TENGFEI","shapeType":"roundRect","bbox":[940,430,270,184]}
+{"kind":"shape","slide":5,"id":"45","role":"team marker JI TENGFEI","shapeType":"ellipse","bbox":[958,446,12,12]}
+{"kind":"shape","slide":5,"id":"46","role":"team name JI TENGFEI","shapeType":"rect","bbox":[980,442,216,22]}
+{"kind":"textbox","slide":5,"id":"46","role":"team name JI TENGFEI","text":"JI TENGFEI","textChars":10,"textLines":1,"bbox":[980,442,216,22]}
+{"kind":"shape","slide":5,"id":"47","role":"team role JI TENGFEI","shapeType":"rect","bbox":[980,464,216,20]}
+{"kind":"textbox","slide":5,"id":"47","role":"team role JI TENGFEI","text":"Data Collection","textChars":15,"textLines":1,"bbox":[980,464,216,20]}
+{"kind":"shape","slide":5,"id":"48","role":"team body JI TENGFEI","shapeType":"rect","bbox":[958,496,234,102]}
+{"kind":"textbox","slide":5,"id":"48","role":"team body JI TENGFEI","text":"Review collection, baseline\nannotation, and merchant\nknowledge prep.","textChars":68,"textLines":3,"bbox":[958,496,234,102]}
+{"kind":"shape","slide":6,"id":"2","role":"base bg","shapeType":"rect","bbox":[0,0,1280,720]}
+{"kind":"shape","slide":6,"id":"3","role":"bg orb","shapeType":"ellipse","bbox":[1000,-130,360,360]}
+{"kind":"shape","slide":6,"id":"4","role":"bg orb","shapeType":"ellipse","bbox":[-110,560,280,280]}
+{"kind":"shape","slide":6,"id":"5","role":"section label","shapeType":"rect","bbox":[70,42,360,24]}
+{"kind":"textbox","slide":6,"id":"5","role":"section label","text":"NEXT STEP","textChars":9,"textLines":1,"bbox":[70,42,360,24]}
+{"kind":"shape","slide":6,"id":"6","role":"page number","shapeType":"rect","bbox":[1120,42,90,24]}
+{"kind":"textbox","slide":6,"id":"6","role":"page number","text":"06 / 06","textChars":7,"textLines":1,"bbox":[1120,42,90,24]}
+{"kind":"shape","slide":6,"id":"7","role":"header rule","shapeType":"rect","bbox":[70,68,1140,2]}
+{"kind":"shape","slide":6,"id":"8","role":"header marker","shapeType":"ellipse","bbox":[60,58,18,18]}
+{"kind":"shape","slide":6,"id":"9","role":"title","shapeType":"rect","bbox":[70,96,920,96]}
+{"kind":"textbox","slide":6,"id":"9","role":"title","text":"The next milestone is a reliable, presentation-ready final system","textChars":65,"textLines":1,"bbox":[70,96,920,96]}
+{"kind":"shape","slide":6,"id":"10","role":"subtitle","shapeType":"rect","bbox":[72,184,860,54]}
+{"kind":"textbox","slide":6,"id":"10","role":"subtitle","text":"The roadmap focuses on RAG integration, stress testing, UI polish, and a strong final demonstration package.","textChars":108,"textLines":1,"bbox":[72,184,860,54]}
+{"kind":"shape","slide":6,"id":"11","role":"timeline rule","shapeType":"rect","bbox":[146,322,980,4]}
+{"kind":"shape","slide":6,"id":"12","role":"timeline RAG Integration","shapeType":"roundRect","bbox":[90,246,240,128]}
+{"kind":"shape","slide":6,"id":"13","role":"timeline marker RAG Integration","shapeType":"ellipse","bbox":[108,264,28,28]}
+{"kind":"shape","slide":6,"id":"14","role":"timeline title RAG Integration","shapeType":"rect","bbox":[150,262,162,24]}
+{"kind":"textbox","slide":6,"id":"14","role":"timeline title RAG Integration","text":"RAG Integration","textChars":15,"textLines":1,"bbox":[150,262,162,24]}
+{"kind":"shape","slide":6,"id":"15","role":"timeline body RAG Integration","shapeType":"rect","bbox":[108,304,204,50]}
+{"kind":"textbox","slide":6,"id":"15","role":"timeline body RAG Integration","text":"Build the vector database and\nvalidate retrieval quality.","textChars":57,"textLines":2,"bbox":[108,304,204,50]}
+{"kind":"shape","slide":6,"id":"16","role":"timeline Stress Testing","shapeType":"roundRect","bbox":[356,246,240,128]}
+{"kind":"shape","slide":6,"id":"17","role":"timeline marker Stress Testing","shapeType":"ellipse","bbox":[374,264,28,28]}
+{"kind":"shape","slide":6,"id":"18","role":"timeline title Stress Testing","shapeType":"rect","bbox":[416,262,162,24]}
+{"kind":"textbox","slide":6,"id":"18","role":"timeline title Stress Testing","text":"Stress Testing","textChars":14,"textLines":1,"bbox":[416,262,162,24]}
+{"kind":"shape","slide":6,"id":"19","role":"timeline body Stress Testing","shapeType":"rect","bbox":[374,304,204,50]}
+{"kind":"textbox","slide":6,"id":"19","role":"timeline body Stress Testing","text":"Run end-to-end tests on\ndifficult edge cases.","textChars":45,"textLines":2,"bbox":[374,304,204,50]}
+{"kind":"shape","slide":6,"id":"20","role":"timeline Product Polish","shapeType":"roundRect","bbox":[622,246,240,128]}
+{"kind":"shape","slide":6,"id":"21","role":"timeline marker Product Polish","shapeType":"ellipse","bbox":[640,264,28,28]}
+{"kind":"shape","slide":6,"id":"22","role":"timeline title Product Polish","shapeType":"rect","bbox":[682,262,162,24]}
+{"kind":"textbox","slide":6,"id":"22","role":"timeline title Product Polish","text":"Product Polish","textChars":14,"textLines":1,"bbox":[682,262,162,24]}
+{"kind":"shape","slide":6,"id":"23","role":"timeline body Product Polish","shapeType":"rect","bbox":[640,304,204,50]}
+{"kind":"textbox","slide":6,"id":"23","role":"timeline body Product Polish","text":"Refactor bottlenecks and improve\nusability.","textChars":43,"textLines":2,"bbox":[640,304,204,50]}
+{"kind":"shape","slide":6,"id":"24","role":"timeline Final Demo","shapeType":"roundRect","bbox":[888,246,240,128]}
+{"kind":"shape","slide":6,"id":"25","role":"timeline marker Final Demo","shapeType":"ellipse","bbox":[906,264,28,28]}
+{"kind":"shape","slide":6,"id":"26","role":"timeline title Final Demo","shapeType":"rect","bbox":[948,262,162,24]}
+{"kind":"textbox","slide":6,"id":"26","role":"timeline title Final Demo","text":"Final Demo","textChars":10,"textLines":1,"bbox":[948,262,162,24]}
+{"kind":"shape","slide":6,"id":"27","role":"timeline body Final Demo","shapeType":"rect","bbox":[906,304,204,50]}
+{"kind":"textbox","slide":6,"id":"27","role":"timeline body Final Demo","text":"Prepare materials and rehearse\nQ&A.","textChars":35,"textLines":2,"bbox":[906,304,204,50]}
+{"kind":"shape","slide":6,"id":"28","role":"closing banner","shapeType":"roundRect","bbox":[70,534,1140,108]}
+{"kind":"shape","slide":6,"id":"29","role":"closing label","shapeType":"rect","bbox":[100,564,150,22]}
+{"kind":"textbox","slide":6,"id":"29","role":"closing label","text":"Target outcome:","textChars":15,"textLines":1,"bbox":[100,564,150,22]}
+{"kind":"shape","slide":6,"id":"30","role":"closing body","shapeType":"rect","bbox":[100,592,990,34]}
+{"kind":"textbox","slide":6,"id":"30","role":"closing body","text":"Deliver a reliable AI support and review-analysis platform that is technically solid, commercially meaningful, and ready for the final presentation.","textChars":148,"textLines":1,"bbox":[100,592,990,34]}

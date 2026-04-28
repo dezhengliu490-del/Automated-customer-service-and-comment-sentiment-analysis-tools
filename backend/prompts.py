@@ -74,6 +74,7 @@ def build_customer_service_user_prompt(
     pain_points: list[str] | None = None,
     style_hint: str | None = None,
     reply_language: str = "zh",
+    retrieved_context: str | None = None,
 ) -> str:
     lang = normalize_summary_language(reply_language)
     s = (sentiment or "unknown").strip()
@@ -94,13 +95,15 @@ def build_customer_service_user_prompt(
     rules = (merchant_rules or "").strip() or "（未提供商家规则）"
     pp = "、".join(pain_points or []) if pain_points else "无"
     style = (style_hint or "默认客服语气").strip()
+    kb = (retrieved_context or "").strip() or "（未检索到额外知识片段）"
     return (
         f"【用户评论】\n{review_text.strip()}\n\n"
         f"【情感倾向】\n{s}\n\n"
         f"【痛点短语】\n{pp}\n\n"
         f"【商家规则】\n{rules}\n\n"
+        f"【检索知识片段】\n{kb}\n\n"
         f"【风格偏好】\n{style}\n\n"
-        "请基于以上信息生成一段中文客服回复。"
+        "请优先遵循商家规则和检索知识片段，生成一段中文客服回复。"
     )
 
 

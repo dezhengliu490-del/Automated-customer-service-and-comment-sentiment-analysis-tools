@@ -1,0 +1,9 @@
+﻿metric,value
+Raw review sample size,1000.0
+Covered categories,10.0
+Gold test set size,200.0
+Overall sentiment accuracy (%),92.5
+Average model confidence,0.878
+Positive predictions in gold_200_end,76.0
+Neutral predictions in gold_200_end,27.0
+Negative predictions in gold_200_end,97.0

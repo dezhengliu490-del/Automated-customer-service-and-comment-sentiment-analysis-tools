@@ -41,6 +41,8 @@ def main() -> None:
     parser.add_argument("--reply-language", default="zh", help="reply language for reply task: zh/en")
     parser.add_argument("--merchant-rules", default="", help="merchant rule text used in reply task")
     parser.add_argument("--merchant-rules-file", default=None, help="UTF-8 file path for merchant rules")
+    parser.add_argument("--kb-file", default=None, help="optional UTF-8 knowledge-base file for RAG retrieval")
+    parser.add_argument("--kb-top-k", type=int, default=3, help="number of retrieved chunks for RAG context")
     parser.add_argument("--sentiment", default=None, help="optional sentiment hint for reply task")
     parser.add_argument("--pain-points", default="", help="optional pain points, comma-separated")
     parser.add_argument("--style-hint", default=None, help="optional style hint for reply tone")
@@ -63,6 +65,7 @@ def main() -> None:
             )
         else:
             rules_text = _read_text_arg(None, args.merchant_rules_file) if args.merchant_rules_file else args.merchant_rules
+            kb_text = _read_text_arg(None, args.kb_file) if args.kb_file else ""
             pain_points = [x.strip() for x in (args.pain_points or "").split(",") if x.strip()]
             result = generate_customer_service_reply_as_dict(
                 review_text=review_text,
@@ -71,6 +74,8 @@ def main() -> None:
                 pain_points=pain_points or None,
                 style_hint=args.style_hint,
                 reply_language=args.reply_language,
+                knowledge_base_text=kb_text,
+                kb_top_k=args.kb_top_k,
             )
 
         print(json.dumps(result, ensure_ascii=False, indent=2))

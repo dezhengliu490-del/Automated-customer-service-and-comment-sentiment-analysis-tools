@@ -27,6 +27,7 @@ from prompts import (
     build_customer_service_user_prompt,
     normalize_summary_language,
 )
+from rag_utils import SimpleRAGIndex, build_context_from_chunks
 from resilience import RetryConfig, TokenBucketRateLimiter, run_with_retry, run_with_retry_async
 
 
@@ -81,6 +82,7 @@ class CustomerServiceReplyEngine:
         pain_points: list[str] | None,
         style_hint: str | None,
         reply_language: str,
+        retrieved_context: str | None,
     ) -> tuple[str, str]:
         lang = normalize_summary_language(reply_language)
         system_instruction = build_customer_service_system_instruction(lang)
@@ -91,8 +93,24 @@ class CustomerServiceReplyEngine:
             pain_points=pain_points,
             style_hint=style_hint,
             reply_language=lang,
+            retrieved_context=retrieved_context,
         )
         return system_instruction, user_prompt
+
+    @staticmethod
+    def _retrieve_context(
+        review_text: str,
+        merchant_rules: str,
+        knowledge_base_text: str | None,
+        kb_top_k: int,
+    ) -> tuple[str, list[str]]:
+        kb_source = (knowledge_base_text or "").strip() or (merchant_rules or "").strip()
+        if not kb_source:
+            return "", []
+        index = SimpleRAGIndex.from_text(kb_source, chunk_size=300, overlap=60)
+        hits = index.retrieve(review_text, top_k=max(1, kb_top_k))
+        context = build_context_from_chunks(hits)
+        return context, [h.text for h in hits]
 
     def generate_reply(
         self,
@@ -103,8 +121,11 @@ class CustomerServiceReplyEngine:
         pain_points: list[str] | None = None,
         style_hint: str | None = None,
         reply_language: str = "zh",
+        knowledge_base_text: str | None = None,
+        kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
+        context, _ = self._retrieve_context(text, merchant_rules, knowledge_base_text, kb_top_k)
         system_instruction, user_prompt = self._build_messages(
             text,
             merchant_rules,
@@ -112,6 +133,7 @@ class CustomerServiceReplyEngine:
             pain_points=pain_points,
             style_hint=style_hint,
             reply_language=reply_language,
+            retrieved_context=context,
         )
         started = time.perf_counter()
         attempts = 1
@@ -187,8 +209,11 @@ class CustomerServiceReplyEngine:
         pain_points: list[str] | None = None,
         style_hint: str | None = None,
         reply_language: str = "zh",
+        knowledge_base_text: str | None = None,
+        kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
+        context, _ = self._retrieve_context(text, merchant_rules, knowledge_base_text, kb_top_k)
         system_instruction, user_prompt = self._build_messages(
             text,
             merchant_rules,
@@ -196,6 +221,7 @@ class CustomerServiceReplyEngine:
             pain_points=pain_points,
             style_hint=style_hint,
             reply_language=reply_language,
+            retrieved_context=context,
         )
         started = time.perf_counter()
         attempts = 1
@@ -276,8 +302,16 @@ def generate_customer_service_reply_as_dict(
     pain_points: list[str] | None = None,
     style_hint: str | None = None,
     reply_language: str = "zh",
+    knowledge_base_text: str | None = None,
+    kb_top_k: int = 3,
 ) -> dict[str, Any]:
     engine = CustomerServiceReplyEngine(provider=provider, model=model)
+    _, retrieved_chunks = engine._retrieve_context(
+        review_text,
+        merchant_rules,
+        knowledge_base_text,
+        kb_top_k,
+    )
     reply = engine.generate_reply(
         review_text,
         merchant_rules,
@@ -285,6 +319,8 @@ def generate_customer_service_reply_as_dict(
         pain_points=pain_points,
         style_hint=style_hint,
         reply_language=reply_language,
+        knowledge_base_text=knowledge_base_text,
+        kb_top_k=kb_top_k,
     )
     return {
         "reply_text": reply,
@@ -292,6 +328,7 @@ def generate_customer_service_reply_as_dict(
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
         "used_rules": bool((merchant_rules or "").strip()),
+        "retrieved_chunks": retrieved_chunks,
     }
 
 
@@ -305,8 +342,16 @@ async def async_generate_customer_service_reply_as_dict(
     pain_points: list[str] | None = None,
     style_hint: str | None = None,
     reply_language: str = "zh",
+    knowledge_base_text: str | None = None,
+    kb_top_k: int = 3,
 ) -> dict[str, Any]:
     engine = CustomerServiceReplyEngine(provider=provider, model=model)
+    _, retrieved_chunks = engine._retrieve_context(
+        review_text,
+        merchant_rules,
+        knowledge_base_text,
+        kb_top_k,
+    )
     reply = await engine.async_generate_reply(
         review_text,
         merchant_rules,
@@ -314,6 +359,8 @@ async def async_generate_customer_service_reply_as_dict(
         pain_points=pain_points,
         style_hint=style_hint,
         reply_language=reply_language,
+        knowledge_base_text=knowledge_base_text,
+        kb_top_k=kb_top_k,
     )
     return {
         "reply_text": reply,
@@ -321,4 +368,5 @@ async def async_generate_customer_service_reply_as_dict(
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
         "used_rules": bool((merchant_rules or "").strip()),
+        "retrieved_chunks": retrieved_chunks,
     }
