@@ -17,8 +17,9 @@ from config import (
     get_llm_retry_max_delay,
     get_llm_timeout_seconds,
 )
+from edge_cases import assess_text_edge_cases, build_defensive_context, prepare_text_for_llm
 from llm_base import LLMService
-from observability import log_llm_call
+from observability import fingerprint_text, log_llm_call, make_request_id
 from prompts import build_system_instruction, build_user_prompt, normalize_summary_language
 from resilience import RetryConfig, TokenBucketRateLimiter, run_with_retry, run_with_retry_async
 from schemas import SentimentAnalysisResult
@@ -55,21 +56,33 @@ class DeepSeekService(LLMService):
             + json.dumps(SentimentAnalysisResult.model_json_schema(), ensure_ascii=False)
         )
 
-    def _messages(self, text: str, summary_language: str) -> list[dict[str, str]]:
+    def _messages(
+        self,
+        text: str,
+        summary_language: str,
+        defensive_context: str = "",
+    ) -> list[dict[str, str]]:
+        user_prompt = build_user_prompt(text, summary_language=summary_language)
+        if defensive_context:
+            user_prompt = f"{user_prompt}\n\n{defensive_context}"
         return [
             {
                 "role": "system",
                 "content": build_system_instruction(summary_language) + self._json_instruction(),
             },
-            {"role": "user", "content": build_user_prompt(text, summary_language=summary_language)},
+            {"role": "user", "content": user_prompt},
         ]
 
     def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
         lang = normalize_summary_language(summary_language)
-        messages = self._messages(text, lang)
+        messages = self._messages(prepared_text, lang, build_defensive_context(assessment, lang))
         started = time.perf_counter()
         attempts = 1
+        request_id = make_request_id("analyze_review")
+        input_hash = fingerprint_text(text)
         try:
             response, attempts = run_with_retry(
                 lambda: self._sync_call_once(messages),
@@ -87,6 +100,13 @@ class DeepSeekService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             return result
         except Exception as exc:
@@ -98,8 +118,15 @@ class DeepSeekService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             raise
 
@@ -120,10 +147,14 @@ class DeepSeekService(LLMService):
         self, review_text: str, summary_language: str = "zh"
     ) -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
         lang = normalize_summary_language(summary_language)
-        messages = self._messages(text, lang)
+        messages = self._messages(prepared_text, lang, build_defensive_context(assessment, lang))
         started = time.perf_counter()
         attempts = 1
+        request_id = make_request_id("async_analyze_review")
+        input_hash = fingerprint_text(text)
         try:
             async with self._semaphore:
                 response, attempts = await run_with_retry_async(
@@ -142,6 +173,13 @@ class DeepSeekService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             return result
         except Exception as exc:
@@ -153,8 +191,15 @@ class DeepSeekService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             raise
 

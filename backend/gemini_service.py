@@ -17,8 +17,9 @@ from config import (
     get_llm_retry_max_delay,
     get_llm_timeout_seconds,
 )
+from edge_cases import assess_text_edge_cases, build_defensive_context, prepare_text_for_llm
 from llm_base import LLMService
-from observability import log_llm_call
+from observability import fingerprint_text, log_llm_call, make_request_id
 from prompts import build_system_instruction, build_user_prompt, normalize_summary_language
 from resilience import RetryConfig, TokenBucketRateLimiter, call_with_timeout, run_with_retry, run_with_retry_async
 from schemas import SentimentAnalysisResult
@@ -55,10 +56,17 @@ class GeminiService(LLMService):
 
     def analyze_review(self, review_text: str, summary_language: str = "zh") -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
         lang = normalize_summary_language(summary_language)
-        user_prompt = build_user_prompt(text, summary_language=lang)
+        defensive_context = build_defensive_context(assessment, lang)
+        user_prompt = build_user_prompt(prepared_text, summary_language=lang)
+        if defensive_context:
+            user_prompt = f"{user_prompt}\n\n{defensive_context}"
         started = time.perf_counter()
         attempts = 1
+        request_id = make_request_id("analyze_review")
+        input_hash = fingerprint_text(text)
         try:
             raw, attempts = run_with_retry(
                 lambda: (
@@ -86,6 +94,13 @@ class GeminiService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             return result
         except Exception as exc:
@@ -97,8 +112,15 @@ class GeminiService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             raise
 
@@ -109,10 +131,17 @@ class GeminiService(LLMService):
         self, review_text: str, summary_language: str = "zh"
     ) -> SentimentAnalysisResult:
         text = self._validate_input(review_text)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
         lang = normalize_summary_language(summary_language)
-        user_prompt = build_user_prompt(text, summary_language=lang)
+        defensive_context = build_defensive_context(assessment, lang)
+        user_prompt = build_user_prompt(prepared_text, summary_language=lang)
+        if defensive_context:
+            user_prompt = f"{user_prompt}\n\n{defensive_context}"
         started = time.perf_counter()
         attempts = 1
+        request_id = make_request_id("async_analyze_review")
+        input_hash = fingerprint_text(text)
         try:
             async with self._semaphore:
                 response, attempts = await run_with_retry_async(
@@ -131,6 +160,13 @@ class GeminiService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             return result
         except Exception as exc:
@@ -142,8 +178,15 @@ class GeminiService(LLMService):
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "prepared_text_length": assessment.prepared_length,
+                    "guardrail_action": assessment.guardrail_action,
+                },
             )
             raise
 

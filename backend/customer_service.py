@@ -21,7 +21,13 @@ from config import (
     get_llm_retry_max_delay,
     get_llm_timeout_seconds,
 )
-from observability import log_llm_call
+from edge_cases import (
+    assess_text_edge_cases,
+    build_customer_service_handoff_reply,
+    build_defensive_context,
+    prepare_text_for_llm,
+)
+from observability import fingerprint_text, log_llm_call, make_request_id
 from prompts import (
     build_customer_service_system_instruction,
     build_customer_service_user_prompt,
@@ -57,6 +63,9 @@ class CustomerServiceReplyEngine:
         )
         self._rate_limiter = TokenBucketRateLimiter(get_llm_rate_limit_rps())
         self._semaphore = asyncio.Semaphore(get_llm_concurrency())
+        self.last_request_id = ""
+        self.last_edge_case_flags: list[str] = []
+        self.last_guardrail_action = "normal"
 
         if self.provider == "gemini":
             self.api_key = api_key or get_gemini_api_key()
@@ -83,6 +92,7 @@ class CustomerServiceReplyEngine:
         style_hint: str | None,
         reply_language: str,
         retrieved_context: str | None,
+        defensive_context: str | None = None,
     ) -> tuple[str, str]:
         lang = normalize_summary_language(reply_language)
         system_instruction = build_customer_service_system_instruction(lang)
@@ -94,6 +104,7 @@ class CustomerServiceReplyEngine:
             style_hint=style_hint,
             reply_language=lang,
             retrieved_context=retrieved_context,
+            defensive_context=defensive_context,
         )
         return system_instruction, user_prompt
 
@@ -125,18 +136,50 @@ class CustomerServiceReplyEngine:
         kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
-        context, _ = self._retrieve_context(text, merchant_rules, knowledge_base_text, kb_top_k)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
+        lang = normalize_summary_language(reply_language)
+        started = time.perf_counter()
+        attempts = 1
+        request_id = make_request_id("customer_service_reply")
+        input_hash = fingerprint_text(text)
+        self.last_request_id = request_id
+        self.last_edge_case_flags = assessment.flags
+        self.last_guardrail_action = assessment.guardrail_action
+
+        if assessment.should_handoff:
+            reply = build_customer_service_handoff_reply(lang)
+            log_llm_call(
+                provider=self.provider,
+                model=self.model,
+                operation="customer_service_reply",
+                status="guarded",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=0,
+                text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "guardrail_reason": assessment.reason,
+                    "prepared_text_length": assessment.prepared_length,
+                },
+            )
+            return reply
+
+        context, _ = self._retrieve_context(prepared_text, merchant_rules, knowledge_base_text, kb_top_k)
+        defensive_context = build_defensive_context(assessment, lang)
         system_instruction, user_prompt = self._build_messages(
-            text,
+            prepared_text,
             merchant_rules,
             sentiment=sentiment,
             pain_points=pain_points,
             style_hint=style_hint,
-            reply_language=reply_language,
+            reply_language=lang,
             retrieved_context=context,
+            defensive_context=defensive_context,
         )
-        started = time.perf_counter()
-        attempts = 1
         try:
             if self.provider == "gemini":
 
@@ -184,6 +227,13 @@ class CustomerServiceReplyEngine:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "prepared_text_length": assessment.prepared_length,
+                },
             )
             return reply
         except Exception as exc:
@@ -195,8 +245,15 @@ class CustomerServiceReplyEngine:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "prepared_text_length": assessment.prepared_length,
+                },
             )
             raise
 
@@ -213,18 +270,50 @@ class CustomerServiceReplyEngine:
         kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
-        context, _ = self._retrieve_context(text, merchant_rules, knowledge_base_text, kb_top_k)
+        assessment = assess_text_edge_cases(text)
+        prepared_text = prepare_text_for_llm(text)
+        lang = normalize_summary_language(reply_language)
+        started = time.perf_counter()
+        attempts = 1
+        request_id = make_request_id("async_customer_service_reply")
+        input_hash = fingerprint_text(text)
+        self.last_request_id = request_id
+        self.last_edge_case_flags = assessment.flags
+        self.last_guardrail_action = assessment.guardrail_action
+
+        if assessment.should_handoff:
+            reply = build_customer_service_handoff_reply(lang)
+            log_llm_call(
+                provider=self.provider,
+                model=self.model,
+                operation="async_customer_service_reply",
+                status="guarded",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                attempts=0,
+                text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "guardrail_reason": assessment.reason,
+                    "prepared_text_length": assessment.prepared_length,
+                },
+            )
+            return reply
+
+        context, _ = self._retrieve_context(prepared_text, merchant_rules, knowledge_base_text, kb_top_k)
+        defensive_context = build_defensive_context(assessment, lang)
         system_instruction, user_prompt = self._build_messages(
-            text,
+            prepared_text,
             merchant_rules,
             sentiment=sentiment,
             pain_points=pain_points,
             style_hint=style_hint,
-            reply_language=reply_language,
+            reply_language=lang,
             retrieved_context=context,
+            defensive_context=defensive_context,
         )
-        started = time.perf_counter()
-        attempts = 1
         try:
             async with self._semaphore:
                 if self.provider == "gemini":
@@ -275,6 +364,13 @@ class CustomerServiceReplyEngine:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "prepared_text_length": assessment.prepared_length,
+                },
             )
             return reply
         except Exception as exc:
@@ -286,8 +382,15 @@ class CustomerServiceReplyEngine:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 attempts=attempts,
                 text_length=len(text),
+                request_id=request_id,
+                input_hash=input_hash,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
+                edge_flags=assessment.flags,
+                extra={
+                    "guardrail_action": assessment.guardrail_action,
+                    "prepared_text_length": assessment.prepared_length,
+                },
             )
             raise
 
@@ -327,8 +430,11 @@ def generate_customer_service_reply_as_dict(
         "provider": engine.provider,
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
-        "used_rules": bool((merchant_rules or "").strip()),
+        "used_rules": bool((merchant_rules or "").strip() or (knowledge_base_text or "").strip()),
         "retrieved_chunks": retrieved_chunks,
+        "request_id": engine.last_request_id,
+        "edge_case_flags": engine.last_edge_case_flags,
+        "guardrail_action": engine.last_guardrail_action,
     }
 
 
@@ -367,6 +473,9 @@ async def async_generate_customer_service_reply_as_dict(
         "provider": engine.provider,
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
-        "used_rules": bool((merchant_rules or "").strip()),
+        "used_rules": bool((merchant_rules or "").strip() or (knowledge_base_text or "").strip()),
         "retrieved_chunks": retrieved_chunks,
+        "request_id": engine.last_request_id,
+        "edge_case_flags": engine.last_edge_case_flags,
+        "guardrail_action": engine.last_guardrail_action,
     }

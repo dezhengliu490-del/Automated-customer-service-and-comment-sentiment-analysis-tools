@@ -1,0 +1,910 @@
+{
+  "total_cases": 65,
+  "status_counts": {
+    "ok": 65
+  },
+  "edge_flag_counts": {
+    "sarcasm_possible": 15,
+    "emoji_heavy": 5,
+    "normal": 20,
+    "repeated_noise": 15,
+    "gibberish": 10,
+    "hostile_language": 5,
+    "prompt_injection_or_link": 5
+  },
+  "latency_ms": {
+    "mean": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "max": 0.0
+  },
+  "resource_usage": {
+    "wall_seconds": 0.007,
+    "cpu_seconds": 0.0,
+    "peak_tracemalloc_mb": 0.024,
+    "throughput_per_second": 8982.99,
+    "max_input_chars": 6000
+  },
+  "results": [
+    {
+      "case_id": "sarcasm_zh_01#r1",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 28,
+      "prepared_length": 28
+    },
+    {
+      "case_id": "sarcasm_zh_02#r1",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 27,
+      "prepared_length": 27
+    },
+    {
+      "case_id": "sarcasm_en_01#r1",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 75,
+      "prepared_length": 75
+    },
+    {
+      "case_id": "emoji_01#r1",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "emoji_heavy"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 5,
+      "prepared_length": 5
+    },
+    {
+      "case_id": "emoji_02#r1",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.55,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 6,
+      "prepared_length": 6
+    },
+    {
+      "case_id": "gibberish_01#r1",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 50,
+      "prepared_length": 50
+    },
+    {
+      "case_id": "gibberish_02#r1",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 24,
+      "prepared_length": 24
+    },
+    {
+      "case_id": "repeated_noise_01#r1",
+      "category": "repeated_noise",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "repeated_noise"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 20,
+      "prepared_length": 20
+    },
+    {
+      "case_id": "long_rant_01#r1",
+      "category": "long_rant",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 68,
+      "prepared_length": 68
+    },
+    {
+      "case_id": "hostile_01#r1",
+      "category": "hostile",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "hostile_language"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 23,
+      "prepared_length": 23
+    },
+    {
+      "case_id": "prompt_injection_01#r1",
+      "category": "prompt_injection",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "prompt_injection_or_link"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 81,
+      "prepared_length": 81
+    },
+    {
+      "case_id": "normal_negative_01#r1",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 21,
+      "prepared_length": 21
+    },
+    {
+      "case_id": "normal_positive_01#r1",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 17,
+      "prepared_length": 17
+    },
+    {
+      "case_id": "sarcasm_zh_01#r2",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 28,
+      "prepared_length": 28
+    },
+    {
+      "case_id": "sarcasm_zh_02#r2",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 27,
+      "prepared_length": 27
+    },
+    {
+      "case_id": "sarcasm_en_01#r2",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 75,
+      "prepared_length": 75
+    },
+    {
+      "case_id": "emoji_01#r2",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "emoji_heavy"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 5,
+      "prepared_length": 5
+    },
+    {
+      "case_id": "emoji_02#r2",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.55,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 6,
+      "prepared_length": 6
+    },
+    {
+      "case_id": "gibberish_01#r2",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 50,
+      "prepared_length": 50
+    },
+    {
+      "case_id": "gibberish_02#r2",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 24,
+      "prepared_length": 24
+    },
+    {
+      "case_id": "repeated_noise_01#r2",
+      "category": "repeated_noise",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "repeated_noise"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 20,
+      "prepared_length": 20
+    },
+    {
+      "case_id": "long_rant_01#r2",
+      "category": "long_rant",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 68,
+      "prepared_length": 68
+    },
+    {
+      "case_id": "hostile_01#r2",
+      "category": "hostile",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "hostile_language"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 23,
+      "prepared_length": 23
+    },
+    {
+      "case_id": "prompt_injection_01#r2",
+      "category": "prompt_injection",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "prompt_injection_or_link"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 81,
+      "prepared_length": 81
+    },
+    {
+      "case_id": "normal_negative_01#r2",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 21,
+      "prepared_length": 21
+    },
+    {
+      "case_id": "normal_positive_01#r2",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 17,
+      "prepared_length": 17
+    },
+    {
+      "case_id": "sarcasm_zh_01#r3",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 28,
+      "prepared_length": 28
+    },
+    {
+      "case_id": "sarcasm_zh_02#r3",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 27,
+      "prepared_length": 27
+    },
+    {
+      "case_id": "sarcasm_en_01#r3",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 75,
+      "prepared_length": 75
+    },
+    {
+      "case_id": "emoji_01#r3",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "emoji_heavy"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 5,
+      "prepared_length": 5
+    },
+    {
+      "case_id": "emoji_02#r3",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.55,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 6,
+      "prepared_length": 6
+    },
+    {
+      "case_id": "gibberish_01#r3",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 50,
+      "prepared_length": 50
+    },
+    {
+      "case_id": "gibberish_02#r3",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 24,
+      "prepared_length": 24
+    },
+    {
+      "case_id": "repeated_noise_01#r3",
+      "category": "repeated_noise",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "repeated_noise"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 20,
+      "prepared_length": 20
+    },
+    {
+      "case_id": "long_rant_01#r3",
+      "category": "long_rant",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 68,
+      "prepared_length": 68
+    },
+    {
+      "case_id": "hostile_01#r3",
+      "category": "hostile",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "hostile_language"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 23,
+      "prepared_length": 23
+    },
+    {
+      "case_id": "prompt_injection_01#r3",
+      "category": "prompt_injection",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "prompt_injection_or_link"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 81,
+      "prepared_length": 81
+    },
+    {
+      "case_id": "normal_negative_01#r3",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 21,
+      "prepared_length": 21
+    },
+    {
+      "case_id": "normal_positive_01#r3",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 17,
+      "prepared_length": 17
+    },
+    {
+      "case_id": "sarcasm_zh_01#r4",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 28,
+      "prepared_length": 28
+    },
+    {
+      "case_id": "sarcasm_zh_02#r4",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 27,
+      "prepared_length": 27
+    },
+    {
+      "case_id": "sarcasm_en_01#r4",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 75,
+      "prepared_length": 75
+    },
+    {
+      "case_id": "emoji_01#r4",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "emoji_heavy"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 5,
+      "prepared_length": 5
+    },
+    {
+      "case_id": "emoji_02#r4",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.55,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 6,
+      "prepared_length": 6
+    },
+    {
+      "case_id": "gibberish_01#r4",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 50,
+      "prepared_length": 50
+    },
+    {
+      "case_id": "gibberish_02#r4",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 24,
+      "prepared_length": 24
+    },
+    {
+      "case_id": "repeated_noise_01#r4",
+      "category": "repeated_noise",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "repeated_noise"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 20,
+      "prepared_length": 20
+    },
+    {
+      "case_id": "long_rant_01#r4",
+      "category": "long_rant",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 68,
+      "prepared_length": 68
+    },
+    {
+      "case_id": "hostile_01#r4",
+      "category": "hostile",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "hostile_language"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 23,
+      "prepared_length": 23
+    },
+    {
+      "case_id": "prompt_injection_01#r4",
+      "category": "prompt_injection",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "prompt_injection_or_link"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 81,
+      "prepared_length": 81
+    },
+    {
+      "case_id": "normal_negative_01#r4",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 21,
+      "prepared_length": 21
+    },
+    {
+      "case_id": "normal_positive_01#r4",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 17,
+      "prepared_length": 17
+    },
+    {
+      "case_id": "sarcasm_zh_01#r5",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 28,
+      "prepared_length": 28
+    },
+    {
+      "case_id": "sarcasm_zh_02#r5",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 27,
+      "prepared_length": 27
+    },
+    {
+      "case_id": "sarcasm_en_01#r5",
+      "category": "sarcasm",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [
+        "sarcasm_possible"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 75,
+      "prepared_length": 75
+    },
+    {
+      "case_id": "emoji_01#r5",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "emoji_heavy"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 5,
+      "prepared_length": 5
+    },
+    {
+      "case_id": "emoji_02#r5",
+      "category": "emoji_only",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.55,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 6,
+      "prepared_length": 6
+    },
+    {
+      "case_id": "gibberish_01#r5",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 50,
+      "prepared_length": 50
+    },
+    {
+      "case_id": "gibberish_02#r5",
+      "category": "gibberish",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "repeated_noise",
+        "gibberish"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 24,
+      "prepared_length": 24
+    },
+    {
+      "case_id": "repeated_noise_01#r5",
+      "category": "repeated_noise",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [
+        "repeated_noise"
+      ],
+      "guardrail_action": "conservative",
+      "original_length": 20,
+      "prepared_length": 20
+    },
+    {
+      "case_id": "long_rant_01#r5",
+      "category": "long_rant",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 68,
+      "prepared_length": 68
+    },
+    {
+      "case_id": "hostile_01#r5",
+      "category": "hostile",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "hostile_language"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 23,
+      "prepared_length": 23
+    },
+    {
+      "case_id": "prompt_injection_01#r5",
+      "category": "prompt_injection",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "neutral",
+      "confidence": 0.35,
+      "edge_flags": [
+        "prompt_injection_or_link"
+      ],
+      "guardrail_action": "handoff_human",
+      "original_length": 81,
+      "prepared_length": 81
+    },
+    {
+      "case_id": "normal_negative_01#r5",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "negative",
+      "confidence": 0.78,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 21,
+      "prepared_length": 21
+    },
+    {
+      "case_id": "normal_positive_01#r5",
+      "category": "normal",
+      "status": "ok",
+      "latency_ms": 0,
+      "sentiment": "positive",
+      "confidence": 0.74,
+      "edge_flags": [],
+      "guardrail_action": "normal",
+      "original_length": 17,
+      "prepared_length": 17
+    }
+  ]
+}

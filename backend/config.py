@@ -5,7 +5,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover
+    def load_dotenv(*_args, **_kwargs) -> bool:
+        return False
 
 # 获取当前文件所在目录下的 .env 文件路径
 _ENV_PATH = Path(__file__).resolve().parent / ".env"
@@ -96,6 +100,10 @@ def get_llm_concurrency() -> int:
 
 def get_llm_rate_limit_rps() -> float:
     return max(0.1, _get_float_env("LLM_RATE_LIMIT_RPS", 5.0))
+
+
+def get_llm_max_input_chars() -> int:
+    return max(500, _get_int_env("LLM_MAX_INPUT_CHARS", 6000))
 
 
 def get_llm_log_path() -> Path:

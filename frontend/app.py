@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import math
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +36,8 @@ SS_BATCH_FAILED = "batch_failed"
 SS_BATCH_RUNNING = "batch_running"
 SS_BATCH_TEXT_COL = "batch_text_col"
 SS_CS_CHAT_HISTORY = "customer_service_chat_history"
+SS_UPLOAD_SIGNATURE = "workspace_upload_signature"
+SS_UPLOAD_INFO = "workspace_upload_info"
 
 
 _EN_WORD = re.compile(r"[A-Za-z]+")
@@ -204,6 +208,120 @@ def _shorten(text: Any, limit: int = 220) -> str:
     return val if len(val) <= limit else f"{val[:limit]}..."
 
 
+def _format_bytes(size: int | float | None) -> str:
+    value = float(size or 0)
+    for unit in ["B", "KB", "MB", "GB"]:
+        if value < 1024 or unit == "GB":
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
+def _format_duration(seconds: float | None) -> str:
+    if seconds is None or not math.isfinite(seconds) or seconds < 0:
+        return "--"
+    if seconds < 1:
+        return "<1s"
+    minutes, sec = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {sec}s"
+    return f"{sec}s"
+
+
+def _uploaded_signature(uploaded: Any) -> str:
+    return f"{getattr(uploaded, 'name', '')}:{getattr(uploaded, 'size', 0)}"
+
+
+def _estimate_parse_seconds(uploaded: Any) -> float:
+    size_mb = float(getattr(uploaded, "size", 0) or 0) / (1024 * 1024)
+    name = str(getattr(uploaded, "name", "") or "").lower()
+    factor = 0.9 if name.endswith((".xlsx", ".xls")) else 0.35
+    return max(0.5, size_mb * factor)
+
+
+def _load_dataframe_with_status(uploaded: Any, i18n: dict[str, str]) -> tuple[pd.DataFrame, dict[str, Any]]:
+    progress = st.progress(0.05, text=i18n["upload_progress_receiving"])
+    status_placeholder = st.empty()
+    started = time.perf_counter()
+    estimated = _estimate_parse_seconds(uploaded)
+    status_placeholder.caption(
+        i18n["upload_meta"].format(
+            name=getattr(uploaded, "name", "-"),
+            size=_format_bytes(getattr(uploaded, "size", 0)),
+            elapsed=_format_duration(0),
+            eta=_format_duration(estimated),
+        )
+    )
+
+    progress.progress(0.3, text=i18n["upload_progress_parsing"].format(eta=_format_duration(estimated)))
+    df_new = load_dataframe(uploaded)
+    elapsed = time.perf_counter() - started
+
+    progress.progress(0.82, text=i18n["upload_progress_validating"])
+    row_count = int(len(df_new))
+    col_count = int(len(df_new.columns))
+    progress.progress(
+        1.0,
+        text=i18n["upload_progress_ready"].format(rows=f"{row_count:,}", cols=col_count),
+    )
+    status_placeholder.caption(
+        i18n["upload_meta"].format(
+            name=getattr(uploaded, "name", "-"),
+            size=_format_bytes(getattr(uploaded, "size", 0)),
+            elapsed=_format_duration(elapsed),
+            eta=_format_duration(0),
+        )
+    )
+    info = {
+        "name": getattr(uploaded, "name", "-"),
+        "size": int(getattr(uploaded, "size", 0) or 0),
+        "rows": row_count,
+        "cols": col_count,
+        "elapsed_seconds": round(elapsed, 3),
+    }
+    return df_new, info
+
+
+def _progress_stats(started: float, finished: int, total: int) -> tuple[float, float, float | None]:
+    elapsed = max(time.perf_counter() - started, 0.001)
+    rate = finished / elapsed if finished else 0.0
+    eta = ((total - finished) / rate) if rate > 0 else None
+    return elapsed, rate, eta
+
+
+def _update_batch_progress(
+    progress,
+    status_placeholder,
+    i18n: dict[str, str],
+    label: str,
+    finished: int,
+    total: int,
+    failed: int,
+    started: float,
+) -> None:
+    total_safe = max(1, total)
+    elapsed, rate, eta = _progress_stats(started, finished, total_safe)
+    progress.progress(
+        min(1.0, finished / total_safe),
+        text=f"{label} {finished}/{total_safe} ({finished / total_safe:.0%})",
+    )
+    status_placeholder.caption(
+        i18n["progress_status"].format(
+            finished=finished,
+            total=total_safe,
+            failed=failed,
+            elapsed=_format_duration(elapsed),
+            eta=_format_duration(eta),
+            rate=f"{rate:.2f}",
+        )
+    )
+
+
 def _local_analyze_review(review_text: str, summary_language: str = "zh") -> dict[str, Any]:
     text = (review_text or "").strip()
     lower_text = text.lower()
@@ -247,9 +365,12 @@ def _run_demo_batch_analysis(
     progress,
     progress_text: str,
     status_placeholder,
+    i18n: dict[str, str],
 ) -> list[dict[str, Any]]:
     total = max(1, len(rows))
     results: list[dict[str, Any]] = []
+    started = time.perf_counter()
+    _update_batch_progress(progress, status_placeholder, i18n, progress_text, 0, total, 0, started)
     for finished_count, (idx, raw_text) in enumerate(rows, start=1):
         res = _local_analyze_review(raw_text, summary_language=summary_language)
         results.append(
@@ -260,8 +381,7 @@ def _run_demo_batch_analysis(
                 **res,
             }
         )
-        progress.progress(finished_count / total, text=f"{progress_text} {finished_count}/{total}")
-        status_placeholder.caption(f"Completed: {finished_count}/{total} | Failed: 0")
+        _update_batch_progress(progress, status_placeholder, i18n, progress_text, finished_count, total, 0, started)
     return results
 
 
@@ -308,6 +428,9 @@ def _generate_demo_reply_as_dict(
         "reply_language": reply_language,
         "used_rules": bool(kb_source),
         "retrieved_chunks": retrieved_chunks,
+        "request_id": "demo-local",
+        "edge_case_flags": [],
+        "guardrail_action": "normal",
     }
 
 
@@ -586,10 +709,13 @@ async def _run_batch_analysis(
     progress,
     progress_text,
     status_placeholder,
+    i18n: dict[str, str],
 ) -> list[dict]:
     total = len(rows)
     finished_count = 0
     failed_count = 0
+    started = time.perf_counter()
+    _update_batch_progress(progress, status_placeholder, i18n, progress_text, 0, total, 0, started)
 
     async def one_call(current_idx: int, raw_text: str) -> dict:
         nonlocal finished_count, failed_count
@@ -614,8 +740,16 @@ async def _run_batch_analysis(
             }
         finally:
             finished_count += 1
-            progress.progress(finished_count / total, text=f"{progress_text} {finished_count}/{total}")
-            status_placeholder.caption(f"Completed: {finished_count}/{total} | Failed: {failed_count}")
+            _update_batch_progress(
+                progress,
+                status_placeholder,
+                i18n,
+                progress_text,
+                finished_count,
+                total,
+                failed_count,
+                started,
+            )
 
     tasks = [one_call(idx, text) for idx, text in rows]
     return await asyncio.gather(*tasks)
@@ -649,6 +783,13 @@ with st.sidebar:
             "tab_cs_chat": "模拟客服聊天",
             "expander_upload": "① 上传文件",
             "file_uploader_label": "选择 CSV 或 Excel",
+            "upload_progress_receiving": "正在接收文件...",
+            "upload_progress_parsing": "正在解析表格，预计剩余 {eta}",
+            "upload_progress_validating": "正在校验列与数据规模...",
+            "upload_progress_ready": "文件已就绪：{rows} 行，{cols} 列",
+            "upload_meta": "{name} · {size} · 已用 {elapsed} · 预计剩余 {eta}",
+            "upload_cached": "已载入：{name} · {rows} 行 · {cols} 列",
+            "upload_error": "文件解析失败：{e}",
             "btn_clear": "清空数据",
             "subheader_preview": "数据预览",
             "metric_rows": "总行数",
@@ -679,6 +820,7 @@ with st.sidebar:
             "failed_retry": "重试失败项",
             "failed_none": "当前批次无失败项。",
             "running_tip": "任务执行中，请勿重复提交。",
+            "progress_status": "已完成 {finished}/{total} · 失败 {failed} · 已用 {elapsed} · 预计剩余 {eta} · {rate} 条/秒",
             "batch_wait_upload": "等待上传数据文件。",
             "result_table": "分析结果",
             "insights_title": "深度痛点分析",
@@ -709,7 +851,7 @@ with st.sidebar:
             "cs_thinking": "客服 AI 正在生成回复...",
             "cs_error": "生成失败：{e}",
             "cs_warn_empty": "请输入用户评论或提问。",
-            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules}",
+            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
             "lang_zh": "中文",
             "lang_en": "English",
         },
@@ -728,6 +870,13 @@ with st.sidebar:
             "tab_cs_chat": "Simulated CS Chat",
             "expander_upload": "① Upload file",
             "file_uploader_label": "Select CSV or Excel",
+            "upload_progress_receiving": "Receiving file...",
+            "upload_progress_parsing": "Parsing table, ETA {eta}",
+            "upload_progress_validating": "Validating columns and size...",
+            "upload_progress_ready": "File ready: {rows} rows, {cols} cols",
+            "upload_meta": "{name} · {size} · elapsed {elapsed} · ETA {eta}",
+            "upload_cached": "Loaded: {name} · {rows} rows · {cols} cols",
+            "upload_error": "File parsing failed: {e}",
             "btn_clear": "Clear",
             "subheader_preview": "Preview",
             "metric_rows": "Rows",
@@ -758,6 +907,7 @@ with st.sidebar:
             "failed_retry": "Retry Failed Items",
             "failed_none": "No failed items in this batch.",
             "running_tip": "A batch is running. Please avoid duplicate submissions.",
+            "progress_status": "Completed {finished}/{total} · Failed {failed} · Elapsed {elapsed} · ETA {eta} · {rate} rows/s",
             "batch_wait_upload": "Waiting for an uploaded data file.",
             "result_table": "Analysis Results",
             "insights_title": "Deep Pain Point Analysis",
@@ -788,7 +938,7 @@ with st.sidebar:
             "cs_thinking": "Generating customer-service reply...",
             "cs_error": "Generation failed: {e}",
             "cs_warn_empty": "Please enter a review or question.",
-            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules}",
+            "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
             "lang_zh": "Chinese",
             "lang_en": "English",
         },
@@ -826,12 +976,39 @@ tab_batch, tab_insights, tab_single, tab_cs = st.tabs(
 with st.expander(d["expander_upload"], expanded=True):
     uploaded = st.file_uploader(d["file_uploader_label"], type=["csv", "xlsx", "xls"])
     if uploaded:
-        df_new = load_dataframe(uploaded)
-        st.session_state[SS_DF] = df_new
-        st.session_state[SS_NAME] = uploaded.name
+        upload_sig = _uploaded_signature(uploaded)
+        if st.session_state.get(SS_UPLOAD_SIGNATURE) != upload_sig:
+            try:
+                for k in [SS_DF, SS_NAME, SS_BATCH_RESULTS, SS_BATCH_FAILED, SS_BATCH_TEXT_COL]:
+                    st.session_state.pop(k, None)
+                df_new, upload_info = _load_dataframe_with_status(uploaded, d)
+                st.session_state[SS_DF] = df_new
+                st.session_state[SS_NAME] = uploaded.name
+                st.session_state[SS_UPLOAD_SIGNATURE] = upload_sig
+                st.session_state[SS_UPLOAD_INFO] = upload_info
+            except Exception as exc:
+                st.error(d["upload_error"].format(e=exc))
+        else:
+            upload_info = st.session_state.get(SS_UPLOAD_INFO, {})
+            if upload_info:
+                st.caption(
+                    d["upload_cached"].format(
+                        name=upload_info.get("name", uploaded.name),
+                        rows=f"{int(upload_info.get('rows', 0)):,}",
+                        cols=int(upload_info.get("cols", 0)),
+                    )
+                )
     if st.session_state.get(SS_DF) is not None:
         if st.button(d["btn_clear"], key="btn_clear_data"):
-            for k in [SS_DF, SS_NAME, SS_BATCH_RESULTS, SS_BATCH_FAILED, SS_BATCH_TEXT_COL]:
+            for k in [
+                SS_DF,
+                SS_NAME,
+                SS_BATCH_RESULTS,
+                SS_BATCH_FAILED,
+                SS_BATCH_TEXT_COL,
+                SS_UPLOAD_SIGNATURE,
+                SS_UPLOAD_INFO,
+            ]:
                 st.session_state.pop(k, None)
             st.rerun()
 
@@ -921,6 +1098,7 @@ with tab_batch:
                         progress,
                         progress_text="Demo analyzing",
                         status_placeholder=status_placeholder,
+                        i18n=d,
                     )
                 else:
                     service = get_llm_service(
@@ -935,6 +1113,7 @@ with tab_batch:
                             progress,
                             progress_text="Analyzing",
                             status_placeholder=status_placeholder,
+                            i18n=d,
                         )
                     )
                 res_df = pd.DataFrame(results)
@@ -976,6 +1155,7 @@ with tab_batch:
                                 progress,
                                 progress_text="Retrying",
                                 status_placeholder=status_placeholder,
+                                i18n=d,
                             )
                         else:
                             service = get_llm_service(
@@ -990,6 +1170,7 @@ with tab_batch:
                                     progress,
                                     progress_text="Retrying",
                                     status_placeholder=status_placeholder,
+                                    i18n=d,
                                 )
                             )
                         retry_df = pd.DataFrame(retried)
@@ -1147,8 +1328,11 @@ with tab_cs:
                                 provider=res.get("provider", "-"),
                                 model=res.get("model", "-"),
                                 used_rules=used_rules,
+                                request_id=res.get("request_id", "-"),
+                                guardrail=res.get("guardrail_action", "normal"),
                             ),
                             "retrieved_chunks": res.get("retrieved_chunks", []),
+                            "edge_case_flags": res.get("edge_case_flags", []),
                         }
                     )
                     st.rerun()
@@ -1161,6 +1345,8 @@ with tab_cs:
         with st.chat_message("assistant"):
             st.write(item["reply_text"])
             st.caption(item["meta"])
+            if item.get("edge_case_flags"):
+                st.caption("Edge flags: " + ", ".join(item["edge_case_flags"]))
             chunks = item.get("retrieved_chunks") or []
             if chunks:
                 with st.expander(d["cs_retrieved_chunks"], expanded=False):

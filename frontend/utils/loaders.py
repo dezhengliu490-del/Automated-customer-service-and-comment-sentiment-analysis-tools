@@ -15,6 +15,8 @@ def load_dataframe(uploaded_file: Any) -> "Any":
 
     # 获取文件名并转为小写以检查后缀
     name = (uploaded_file.name or "").lower()
+    if hasattr(uploaded_file, "seek"):
+        uploaded_file.seek(0)
     # 读取原始字节流
     raw = uploaded_file.read()
     bio = BytesIO(raw)
