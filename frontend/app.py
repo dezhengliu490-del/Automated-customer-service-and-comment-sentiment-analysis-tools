@@ -7,6 +7,7 @@ import math
 import re
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -381,7 +382,7 @@ def _get_configured_users() -> dict[str, dict[str, str]]:
         return users
 
     for username, payload in users_section.items():
-        if not isinstance(payload, dict):
+        if not isinstance(payload, Mapping):
             continue
         normalized_username = str(username or "").strip()
         password = str(payload.get("password", "") or "").strip()
