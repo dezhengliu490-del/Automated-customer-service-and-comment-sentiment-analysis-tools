@@ -66,6 +66,9 @@ SS_DEMO_CONTEXT = "demo_context"
 SS_CS_DEFAULT_RULES = "customer_service_default_rules"
 SS_ACCESS_GRANTED = "access_granted"
 SS_USER_ROLE = "user_role"
+SS_AUTH_USER = "auth_user"
+SS_AUTH_LAST_USERNAME = "auth_last_username"
+SS_AUTH_ERROR = "auth_error"
 
 
 _EN_WORD = re.compile(r"[A-Za-z]+")
@@ -162,6 +165,24 @@ def _inject_demo_css() -> None:
         .stButton > button {
             border-radius: 7px;
             font-weight: 600;
+        }
+        .auth-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px 14px 10px 14px;
+            margin-bottom: 10px;
+        }
+        .auth-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .auth-subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 0;
         }
         </style>
         """,
@@ -347,6 +368,167 @@ def _get_configured_admin_password() -> str:
     except Exception:
         secret_value = None
     return str(secret_value or get_app_admin_password() or "").strip()
+
+
+def _get_configured_users() -> dict[str, dict[str, str]]:
+    try:
+        users_section = st.secrets.get("users")
+    except Exception:
+        users_section = None
+
+    users: dict[str, dict[str, str]] = {}
+    if not users_section:
+        return users
+
+    for username, payload in users_section.items():
+        if not isinstance(payload, dict):
+            continue
+        normalized_username = str(username or "").strip()
+        password = str(payload.get("password", "") or "").strip()
+        if not normalized_username or not password:
+            continue
+        merchant_name = str(payload.get("merchant_name", "") or "").strip() or normalized_username
+        merchant_slug = _slugify(str(payload.get("merchant_slug", "") or merchant_name))
+        role = str(payload.get("role", "operator") or "operator").strip().lower()
+        users[normalized_username] = {
+            "password": password,
+            "merchant_name": merchant_name,
+            "merchant_slug": merchant_slug,
+            "role": "admin" if role == "admin" else "operator",
+            "display_name": str(payload.get("display_name", "") or normalized_username).strip() or normalized_username,
+        }
+    return users
+
+
+def _clear_login_session() -> None:
+    for key in [
+        SS_ACCESS_GRANTED,
+        SS_USER_ROLE,
+        SS_AUTH_USER,
+        SS_AUTH_LAST_USERNAME,
+        SS_AUTH_ERROR,
+        SS_DEMO_CONTEXT,
+        SS_CS_DEFAULT_RULES,
+        "merchant_name",
+        "merchant_slug",
+        "operator_name",
+    ]:
+        st.session_state.pop(key, None)
+
+
+def _render_login_gate(
+    *,
+    lang: str,
+    access_password: str,
+    admin_password: str,
+    configured_users: dict[str, dict[str, str]],
+) -> None:
+    zh = lang == "zh"
+    auth_title = "登录" if zh else "Sign In"
+    auth_user_label = "用户名" if zh else "Username"
+    auth_pw_label = "密码" if zh else "Password"
+    auth_admin_pw_label = "管理员密码（可选）" if zh else "Admin password (optional)"
+    auth_merchant_label = "商家名称" if zh else "Merchant name"
+    auth_slug_label = "商家标识" if zh else "Merchant slug"
+    auth_operator_label = "操作员名称" if zh else "Operator name"
+    auth_btn = "登录" if zh else "Sign in"
+    auth_need = "请输入正确账号密码后继续。" if zh else "Enter a valid username and password to continue."
+    auth_open = "当前未配置用户或访问密码，应用处于开放试用模式。" if zh else "No users or access password configured. App is in open trial mode."
+    auth_hint = "支持多账号登录，登录后会自动绑定商家和角色。" if zh else "Multi-user login is supported. Merchant and role are bound automatically after sign-in."
+    auth_subtitle = "请输入账号密码进入系统。" if zh else "Sign in with your account to continue."
+    auth_failed_detail = "登录失败，请检查用户名或密码。" if zh else "Sign-in failed. Check your username or password."
+    auth_demo_mode = "当前为兼容模式：使用共享密码进入应用。" if zh else "Compatibility mode: use the shared password to enter the app."
+
+    wrap_left, wrap_center, wrap_right = st.columns([1.2, 1.6, 1.2])
+    with wrap_center:
+        st.markdown(
+            f"""
+            <div class="auth-card">
+              <div class="auth-title">{auth_title}</div>
+              <p class="auth-subtitle">{auth_subtitle}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption(auth_hint)
+
+        if configured_users:
+            with st.form("auth_login_form_main", clear_on_submit=False):
+                username_input = st.text_input(
+                    auth_user_label,
+                    value=st.session_state.get(SS_AUTH_USER) or st.session_state.get(SS_AUTH_LAST_USERNAME, ""),
+                    key="login_username_main",
+                )
+                password_input = st.text_input(auth_pw_label, type="password", value="", key="login_password_main")
+                submitted = st.form_submit_button(auth_btn, use_container_width=True)
+            if submitted:
+                st.session_state[SS_AUTH_LAST_USERNAME] = username_input.strip()
+                profile = configured_users.get(username_input.strip())
+                if profile and password_input.strip() == profile.get("password", ""):
+                    old_slug = st.session_state.get("merchant_slug")
+                    old_user = st.session_state.get("operator_name")
+                    st.session_state[SS_AUTH_USER] = username_input.strip()
+                    st.session_state["merchant_name"] = profile["merchant_name"]
+                    st.session_state["merchant_slug"] = profile["merchant_slug"]
+                    st.session_state["operator_name"] = profile["display_name"]
+                    if old_slug != st.session_state["merchant_slug"] or old_user != st.session_state["operator_name"]:
+                        st.session_state.pop(SS_DEMO_CONTEXT, None)
+                        st.session_state.pop(SS_CS_DEFAULT_RULES, None)
+                    st.session_state[SS_ACCESS_GRANTED] = True
+                    st.session_state[SS_USER_ROLE] = profile["role"]
+                    st.session_state.pop(SS_AUTH_ERROR, None)
+                    st.rerun()
+                else:
+                    st.session_state[SS_ACCESS_GRANTED] = False
+                    st.session_state[SS_AUTH_ERROR] = auth_failed_detail
+        else:
+            st.caption(auth_demo_mode)
+            merchant_name_input = st.text_input(auth_merchant_label, value=st.session_state.get("merchant_name", "Demo Merchant"))
+            merchant_slug_input = st.text_input(
+                auth_slug_label,
+                value=st.session_state.get("merchant_slug", _slugify(merchant_name_input)),
+            )
+            operator_name_input = st.text_input(auth_operator_label, value=st.session_state.get("operator_name", "Demo User"))
+            with st.form("auth_legacy_form_main", clear_on_submit=False):
+                password_input = ""
+                admin_password_input = ""
+                if access_password:
+                    password_input = st.text_input(auth_pw_label, type="password", value="", key="access_password_input_main")
+                else:
+                    st.caption(auth_open)
+                    st.session_state[SS_ACCESS_GRANTED] = True
+                    st.session_state[SS_USER_ROLE] = "admin"
+
+                if admin_password:
+                    admin_password_input = st.text_input(auth_admin_pw_label, type="password", value="", key="admin_password_input_main")
+                submitted_legacy = st.form_submit_button(auth_btn, use_container_width=True)
+
+            if submitted_legacy:
+                if access_password and password_input.strip() != access_password:
+                    st.session_state[SS_ACCESS_GRANTED] = False
+                    st.session_state[SS_AUTH_ERROR] = auth_failed_detail
+                else:
+                    old_slug = st.session_state.get("merchant_slug")
+                    old_user = st.session_state.get("operator_name")
+                    st.session_state["merchant_name"] = merchant_name_input.strip() or "Demo Merchant"
+                    st.session_state["merchant_slug"] = _slugify(merchant_slug_input or merchant_name_input)
+                    st.session_state["operator_name"] = operator_name_input.strip() or "Demo User"
+                    st.session_state[SS_AUTH_USER] = st.session_state.get("operator_name", "Demo User")
+                    if old_slug != st.session_state["merchant_slug"] or old_user != st.session_state["operator_name"]:
+                        st.session_state.pop(SS_DEMO_CONTEXT, None)
+                        st.session_state.pop(SS_CS_DEFAULT_RULES, None)
+                    st.session_state[SS_ACCESS_GRANTED] = True
+                    if admin_password and admin_password_input.strip() == admin_password:
+                        st.session_state[SS_USER_ROLE] = "admin"
+                    else:
+                        st.session_state[SS_USER_ROLE] = "operator" if access_password or admin_password else "admin"
+                    st.session_state.pop(SS_AUTH_ERROR, None)
+                    st.rerun()
+
+        if st.session_state.get(SS_AUTH_ERROR):
+            st.error(str(st.session_state.get(SS_AUTH_ERROR)))
+        else:
+            st.info(auth_need)
 
 
 def _slugify(text: str) -> str:
@@ -1902,64 +2084,14 @@ with st.sidebar:
 
     access_password = _get_configured_access_password()
     admin_password = _get_configured_admin_password()
-    auth_title = "访问控制" if lang == "zh" else "Access"
-    auth_pw_label = "访问密码" if lang == "zh" else "Access password"
-    auth_admin_pw_label = "管理员密码（可选）" if lang == "zh" else "Admin password (optional)"
-    auth_merchant_label = "商家名称" if lang == "zh" else "Merchant name"
-    auth_slug_label = "商家标识" if lang == "zh" else "Merchant slug"
-    auth_user_label = "操作员名称" if lang == "zh" else "Operator name"
-    auth_btn = "进入应用" if lang == "zh" else "Enter app"
-    auth_ok = "已通过访问校验" if lang == "zh" else "Access granted"
-    auth_need = "请输入正确密码后继续。" if lang == "zh" else "Enter the correct password to continue."
-    auth_open = "当前未配置访问密码，应用处于开放试用模式。" if lang == "zh" else "No access password configured. App is in open trial mode."
+    configured_users = _get_configured_users()
+    auth_logout = "退出登录" if lang == "zh" else "Sign out"
+    auth_ok = "已登录" if lang == "zh" else "Signed in"
     auth_role_admin = "管理员" if lang == "zh" else "Admin"
     auth_role_operator = "操作员" if lang == "zh" else "Operator"
     auth_role_now = "当前角色：{role}" if lang == "zh" else "Current role: {role}"
-
-    with st.expander(auth_title, expanded=True):
-        merchant_name_input = st.text_input(auth_merchant_label, value=st.session_state.get("merchant_name", "Demo Merchant"))
-        merchant_slug_input = st.text_input(
-            auth_slug_label,
-            value=st.session_state.get("merchant_slug", _slugify(merchant_name_input)),
-        )
-        operator_name_input = st.text_input(auth_user_label, value=st.session_state.get("operator_name", "Demo User"))
-        password_input = ""
-        admin_password_input = ""
-        if access_password:
-            password_input = st.text_input(auth_pw_label, type="password", value="", key="access_password_input")
-        else:
-            st.caption(auth_open)
-            st.session_state[SS_ACCESS_GRANTED] = True
-            st.session_state[SS_USER_ROLE] = "admin"
-
-        if admin_password:
-            admin_password_input = st.text_input(auth_admin_pw_label, type="password", value="", key="admin_password_input")
-
-        if st.button(auth_btn, use_container_width=True, key="auth_submit"):
-            if access_password and password_input.strip() != access_password:
-                st.session_state[SS_ACCESS_GRANTED] = False
-            else:
-                old_slug = st.session_state.get("merchant_slug")
-                old_user = st.session_state.get("operator_name")
-                st.session_state["merchant_name"] = merchant_name_input.strip() or "Demo Merchant"
-                st.session_state["merchant_slug"] = _slugify(merchant_slug_input or merchant_name_input)
-                st.session_state["operator_name"] = operator_name_input.strip() or "Demo User"
-                if old_slug != st.session_state["merchant_slug"] or old_user != st.session_state["operator_name"]:
-                    st.session_state.pop(SS_DEMO_CONTEXT, None)
-                    st.session_state.pop(SS_CS_DEFAULT_RULES, None)
-                st.session_state[SS_ACCESS_GRANTED] = True
-                if admin_password and admin_password_input.strip() == admin_password:
-                    st.session_state[SS_USER_ROLE] = "admin"
-                else:
-                    st.session_state[SS_USER_ROLE] = "operator" if access_password or admin_password else "admin"
-                st.rerun()
-
-        if st.session_state.get(SS_ACCESS_GRANTED):
-            st.success(auth_ok)
-            role_label = auth_role_admin if _is_admin() else auth_role_operator
-            st.caption(auth_role_now.format(role=role_label))
-        elif access_password:
-            st.warning(auth_need)
+    auth_user_now = "当前用户：{user}" if lang == "zh" else "Current user: {user}"
+    auth_merchant_now = "当前商家：{merchant}" if lang == "zh" else "Current merchant: {merchant}"
 
     I18N = {
         "zh": {
@@ -2477,15 +2609,32 @@ with st.sidebar:
         st.session_state["summary_language"] = summary_lang
         st.session_state["demo_mode"] = demo_mode
 
-    if access_password and not st.session_state.get(SS_ACCESS_GRANTED):
-        st.stop()
-
-    _render_recent_activity(d)
+    if st.session_state.get(SS_ACCESS_GRANTED):
+        st.success(auth_ok)
+        role_label = auth_role_admin if _is_admin() else auth_role_operator
+        st.caption(auth_role_now.format(role=role_label))
+        if st.session_state.get(SS_AUTH_USER):
+            st.caption(auth_user_now.format(user=st.session_state.get(SS_AUTH_USER)))
+        if st.session_state.get("merchant_name"):
+            st.caption(auth_merchant_now.format(merchant=st.session_state.get("merchant_name")))
+        if st.button(auth_logout, use_container_width=True, key="auth_logout_btn"):
+            _clear_login_session()
+            st.rerun()
+        _render_recent_activity(d)
 
 st.title(d["page_title"])
 st.markdown(d["page_subtitle"])
 
 _inject_demo_css()
+
+if (access_password or configured_users) and not st.session_state.get(SS_ACCESS_GRANTED):
+    _render_login_gate(
+        lang=lang,
+        access_password=access_password,
+        admin_password=admin_password,
+        configured_users=configured_users,
+    )
+    st.stop()
 
 tab_batch, tab_insights, tab_report, tab_single, tab_cs, tab_history, tab_rules, tab_admin = st.tabs(
     [
