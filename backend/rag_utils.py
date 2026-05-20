@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from typing import Any
 
 
 _SPACE_RE = re.compile(r"\s+")
@@ -56,22 +57,51 @@ class SimpleRAGIndex:
     - compute BM25-like score for retrieval
     """
 
-    def __init__(self, chunks: list[str]):
+    def __init__(
+        self,
+        chunks: list[str],
+        *,
+        chunk_tokens: list[list[str]] | None = None,
+        df: dict[str, int] | None = None,
+        avg_len: float | None = None,
+    ):
         self.chunks = [c for c in chunks if c.strip()]
-        self.chunk_tokens = [tokenize(c) for c in self.chunks]
-        self.df: dict[str, int] = {}
-        for toks in self.chunk_tokens:
-            for t in set(toks):
-                self.df[t] = self.df.get(t, 0) + 1
+        self.chunk_tokens = chunk_tokens if chunk_tokens is not None else [tokenize(c) for c in self.chunks]
+        if len(self.chunk_tokens) != len(self.chunks):
+            self.chunk_tokens = [tokenize(c) for c in self.chunks]
+        if df is None:
+            self.df = {}
+            for toks in self.chunk_tokens:
+                for t in set(toks):
+                    self.df[t] = self.df.get(t, 0) + 1
+        else:
+            self.df = dict(df)
         self.avg_len = (
-            sum(len(toks) for toks in self.chunk_tokens) / len(self.chunk_tokens)
-            if self.chunk_tokens
-            else 1.0
+            float(avg_len)
+            if avg_len is not None
+            else (sum(len(toks) for toks in self.chunk_tokens) / len(self.chunk_tokens) if self.chunk_tokens else 1.0)
         )
 
     @classmethod
     def from_text(cls, text: str, *, chunk_size: int = 300, overlap: int = 60) -> "SimpleRAGIndex":
         return cls(split_text_chunks(text, chunk_size=chunk_size, overlap=overlap))
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "SimpleRAGIndex":
+        return cls(
+            list(payload.get("chunks", [])),
+            chunk_tokens=[list(row) for row in payload.get("chunk_tokens", [])],
+            df=dict(payload.get("df", {})),
+            avg_len=float(payload.get("avg_len", 1.0)),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "chunks": self.chunks,
+            "chunk_tokens": self.chunk_tokens,
+            "df": self.df,
+            "avg_len": self.avg_len,
+        }
 
     def retrieve(self, query: str, *, top_k: int = 3) -> list[ScoredChunk]:
         if not self.chunks:

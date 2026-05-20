@@ -23,6 +23,7 @@ if str(_BACKEND) not in sys.path:
 
 from llm_factory import get_llm_service
 from customer_service import generate_customer_service_reply_as_dict
+from collector.taobao_collector import TaobaoCollectionError, collect_taobao_reviews
 from insights import top_pain_points_from_results
 from rag_utils import SimpleRAGIndex
 from reporting import (
@@ -45,6 +46,7 @@ from config import (
     get_llm_max_retries,
     get_llm_rate_limit_rps,
     get_llm_timeout_seconds,
+    get_taobao_cookie,
 )
 
 # 导入前端工具函数
@@ -70,6 +72,7 @@ SS_USER_ROLE = "user_role"
 SS_AUTH_USER = "auth_user"
 SS_AUTH_LAST_USERNAME = "auth_last_username"
 SS_AUTH_ERROR = "auth_error"
+SS_COLLECT_RESULT = "collect_result"
 
 
 _EN_WORD = re.compile(r"[A-Za-z]+")
@@ -401,6 +404,15 @@ def _get_configured_users() -> dict[str, dict[str, str]]:
     return users
 
 
+def _get_configured_taobao_cookie() -> str:
+    secret_value = None
+    try:
+        secret_value = st.secrets.get("TAOBAO_COOKIE")
+    except Exception:
+        secret_value = None
+    return str(secret_value or get_taobao_cookie() or "").strip()
+
+
 def _clear_login_session() -> None:
     for key in [
         SS_ACCESS_GRANTED,
@@ -573,6 +585,27 @@ def _persist_upload(upload_info: dict[str, Any], upload_signature: str) -> None:
         col_count=int(upload_info.get("cols", 0) or 0),
     )
     st.session_state[SS_LAST_UPLOAD_ID] = upload_id
+
+
+def _activate_collected_reviews(df_new: pd.DataFrame, result: dict[str, Any]) -> None:
+    filename = f"taobao_reviews_{result.get('item_id', 'collected')}.csv"
+    upload_info = {
+        "name": filename,
+        "size": int(len(_dataframe_to_csv_bytes(df_new))),
+        "rows": int(len(df_new)),
+        "cols": int(len(df_new.columns)),
+        "elapsed_seconds": 0.0,
+    }
+    upload_sig = f"collector:{result.get('platform', 'taobao')}:{result.get('item_id', '')}:{len(df_new)}"
+
+    for key in [SS_BATCH_RESULTS, SS_BATCH_FAILED, SS_BATCH_TEXT_COL, SS_BATCH_JOB_ID]:
+        st.session_state.pop(key, None)
+
+    st.session_state[SS_DF] = df_new
+    st.session_state[SS_NAME] = filename
+    st.session_state[SS_UPLOAD_SIGNATURE] = upload_sig
+    st.session_state[SS_UPLOAD_INFO] = upload_info
+    _persist_upload(upload_info, upload_sig)
 
 
 def _create_batch_job(
@@ -978,6 +1011,86 @@ def _render_admin_center(i18n: dict[str, str]) -> None:
         )
     else:
         st.info(i18n["admin_no_logs"])
+
+
+def _render_collect_center(i18n: dict[str, str]) -> None:
+    st.subheader(i18n["collect_title"])
+    st.caption(i18n["collect_hint"])
+    configured_cookie = _get_configured_taobao_cookie()
+    if configured_cookie:
+        st.caption(i18n["collect_cookie_configured"])
+
+    with st.form("taobao_collect_form", clear_on_submit=False):
+        product_url = st.text_input(i18n["collect_url"], key="collect_product_url")
+        cookie = st.text_area(i18n["collect_cookie"], height=120, key="collect_cookie")
+        form_cols = st.columns(3)
+        with form_cols[0]:
+            pages = st.number_input(i18n["collect_pages"], min_value=1, max_value=10, value=1, step=1)
+        with form_cols[1]:
+            page_size = st.number_input(i18n["collect_page_size"], min_value=5, max_value=50, value=20, step=5)
+        with form_cols[2]:
+            seller_id = st.text_input(i18n["collect_seller_id"], key="collect_seller_id")
+        submit = st.form_submit_button(i18n["collect_submit"], type="primary", use_container_width=True)
+
+    if submit:
+        try:
+            with st.spinner(i18n["collect_running"]):
+                result = collect_taobao_reviews(
+                    product_url=product_url,
+                    cookie=(cookie or "").strip() or configured_cookie,
+                    pages=int(pages),
+                    page_size=int(page_size),
+                    seller_id_override=seller_id.strip() or None,
+                )
+            st.session_state[SS_COLLECT_RESULT] = result
+            st.success(i18n["collect_success"].format(count=int(result.get("review_count", 0) or 0)))
+        except TaobaoCollectionError as exc:
+            st.error(i18n["collect_error"].format(error=exc))
+        except Exception as exc:
+            st.error(i18n["collect_error"].format(error=exc))
+
+    result = st.session_state.get(SS_COLLECT_RESULT)
+    if not isinstance(result, dict):
+        return
+
+    reviews = result.get("reviews", [])
+    if not reviews:
+        st.info(i18n["collect_empty"])
+        return
+
+    preview_df = pd.DataFrame(reviews)
+    info_cols = st.columns(4)
+    info_cols[0].metric(i18n["collect_metric_reviews"], int(result.get("review_count", 0) or 0))
+    info_cols[1].metric(i18n["collect_metric_platform"], str(result.get("platform", "-")).upper())
+    info_cols[2].metric(i18n["collect_metric_item"], str(result.get("item_id", "-")))
+    info_cols[3].metric(i18n["collect_metric_pages"], int(result.get("pages_requested", 0) or 0))
+    st.caption(
+        i18n["collect_meta"].format(
+            title=result.get("product_name", "-"),
+            seller=result.get("seller_id", "-") or "-",
+        )
+    )
+
+    if result.get("warnings"):
+        st.warning(" | ".join(str(x) for x in result.get("warnings", [])[:3]))
+
+    action_cols = st.columns([1, 1])
+    with action_cols[0]:
+        if st.button(i18n["collect_use_dataset"], key="collect_use_dataset_btn", use_container_width=True):
+            _activate_collected_reviews(preview_df, result)
+            st.success(i18n["collect_dataset_ready"])
+            st.rerun()
+    with action_cols[1]:
+        st.download_button(
+            i18n["collect_download_csv"],
+            data=_dataframe_to_csv_bytes(preview_df),
+            file_name=f"taobao_reviews_{result.get('item_id', 'collected')}.csv",
+            mime="text/csv",
+            key="collect_download_csv_btn",
+            use_container_width=True,
+        )
+
+    st.dataframe(preview_df.head(100), use_container_width=True, hide_index=True)
 
 
 def _render_history_center(i18n: dict[str, str]) -> None:
@@ -2117,6 +2230,7 @@ with st.sidebar:
             "tab_report": "报告快照",
             "tab_single": "单条评论",
             "tab_cs_chat": "模拟客服聊天",
+            "tab_collect": "评论采集",
             "tab_history": "历史记录",
             "tab_rules": "规则与知识库",
             "tab_admin": "系统状态",
@@ -2219,6 +2333,27 @@ with st.sidebar:
             "cs_error": "生成失败：{e}",
             "cs_warn_empty": "请输入用户评论或提问。",
             "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
+            "collect_title": "淘宝评论采集",
+            "collect_hint": "这是适配 Streamlit Cloud 的轻量采集方式：输入商品链接和登录后的 Cookie，尝试直接抓取评论并转成当前工作区数据。",
+            "collect_url": "商品链接",
+            "collect_cookie": "登录 Cookie（可选覆盖）",
+            "collect_cookie_configured": "已检测到已配置的淘宝 Cookie，当前可直接采集；如需临时覆盖，可在下方粘贴新的 Cookie。",
+            "collect_pages": "采集页数",
+            "collect_page_size": "每页条数",
+            "collect_seller_id": "seller_id（天猫可选手填）",
+            "collect_submit": "开始采集",
+            "collect_running": "正在采集评论...",
+            "collect_success": "采集成功，共获取 {count} 条评论。",
+            "collect_error": "采集失败：{error}",
+            "collect_empty": "当前还没有采集结果。",
+            "collect_metric_reviews": "评论数",
+            "collect_metric_platform": "平台",
+            "collect_metric_item": "商品 ID",
+            "collect_metric_pages": "页数",
+            "collect_meta": "商品：{title} | seller_id：{seller}",
+            "collect_use_dataset": "载入当前工作区",
+            "collect_dataset_ready": "采集结果已载入当前工作区，可以直接去批量分析。",
+            "collect_download_csv": "下载采集 CSV",
             "activity_title": "最近活动",
             "activity_uploads": "上传记录",
             "activity_jobs": "分析任务",
@@ -2368,6 +2503,7 @@ with st.sidebar:
             "tab_report": "Report Snapshot",
             "tab_single": "Single Review",
             "tab_cs_chat": "Simulated CS Chat",
+            "tab_collect": "Review Collector",
             "tab_history": "History Center",
             "tab_rules": "Rules & KB",
             "tab_admin": "System Status",
@@ -2470,6 +2606,27 @@ with st.sidebar:
             "cs_error": "Generation failed: {e}",
             "cs_warn_empty": "Please enter a review or question.",
             "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
+            "collect_title": "Taobao Review Collector",
+            "collect_hint": "This is a lightweight Streamlit Cloud-friendly collector: provide a product URL and a logged-in Cookie, then try to fetch review data directly into the current workspace.",
+            "collect_url": "Product URL",
+            "collect_cookie": "Logged-in Cookie (optional override)",
+            "collect_cookie_configured": "A configured Taobao cookie was detected. Collection can run directly; paste a new one below only if you need to override it temporarily.",
+            "collect_pages": "Pages to fetch",
+            "collect_page_size": "Rows per page",
+            "collect_seller_id": "seller_id (optional for Tmall)",
+            "collect_submit": "Collect reviews",
+            "collect_running": "Collecting reviews...",
+            "collect_success": "Collection completed with {count} reviews.",
+            "collect_error": "Collection failed: {error}",
+            "collect_empty": "No collected reviews yet.",
+            "collect_metric_reviews": "Reviews",
+            "collect_metric_platform": "Platform",
+            "collect_metric_item": "Item ID",
+            "collect_metric_pages": "Pages",
+            "collect_meta": "Product: {title} | seller_id: {seller}",
+            "collect_use_dataset": "Use as current dataset",
+            "collect_dataset_ready": "Collected reviews are now loaded into the workspace and ready for batch analysis.",
+            "collect_download_csv": "Download collected CSV",
             "activity_title": "Recent Activity",
             "activity_uploads": "Uploads",
             "activity_jobs": "Analysis jobs",
@@ -2654,13 +2811,14 @@ if (access_password or configured_users) and not st.session_state.get(SS_ACCESS_
     )
     st.stop()
 
-tab_batch, tab_insights, tab_report, tab_single, tab_cs, tab_history, tab_rules, tab_admin = st.tabs(
+tab_batch, tab_insights, tab_report, tab_single, tab_cs, tab_collect, tab_history, tab_rules, tab_admin = st.tabs(
     [
         d["tab_batch"],
         d["tab_insights"],
         d["tab_report"],
         d["tab_single"],
         d["tab_cs_chat"],
+        d["tab_collect"],
         d["tab_history"],
         d["tab_rules"],
         d["tab_admin"],
@@ -2704,6 +2862,7 @@ with st.expander(d["expander_upload"], expanded=True):
                 SS_UPLOAD_SIGNATURE,
                 SS_UPLOAD_INFO,
                 SS_LAST_UPLOAD_ID,
+                SS_COLLECT_RESULT,
             ]:
                 st.session_state.pop(k, None)
             st.rerun()
@@ -2911,6 +3070,9 @@ with tab_single:
                     st.json(res)
                 except Exception as exc:
                     st.error(d["error_runtime"].format(e=exc))
+
+with tab_collect:
+    _render_collect_center(d)
 
 with tab_history:
     _render_history_center(d)

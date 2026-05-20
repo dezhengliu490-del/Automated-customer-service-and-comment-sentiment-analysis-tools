@@ -126,3 +126,19 @@ def get_app_access_password() -> str:
 
 def get_app_admin_password() -> str:
     return os.environ.get("APP_ADMIN_PASSWORD", "").strip()
+
+
+def get_taobao_cookie() -> str:
+    return (
+        os.environ.get("TAOBAO_COOKIE")
+        or os.environ.get("COOKIE")
+        or os.environ.get("cookie")
+        or ""
+    ).strip()
+
+
+def get_kb_index_dir() -> Path:
+    p = os.environ.get("KB_INDEX_DIR", "").strip()
+    if p:
+        return Path(p)
+    return Path(__file__).resolve().parent / "data" / "kb_indices"

@@ -27,6 +27,7 @@ from edge_cases import (
     build_defensive_context,
     prepare_text_for_llm,
 )
+from knowledge_base import search_knowledge_base_index_file
 from observability import fingerprint_text, log_llm_call, make_request_id
 from prompts import (
     build_customer_service_system_instruction,
@@ -114,7 +115,16 @@ class CustomerServiceReplyEngine:
         merchant_rules: str,
         knowledge_base_text: str | None,
         kb_top_k: int,
+        knowledge_base_index_path: str | None = None,
     ) -> tuple[str, list[str]]:
+        if knowledge_base_index_path:
+            result = search_knowledge_base_index_file(
+                knowledge_base_index_path,
+                review_text,
+                top_k=kb_top_k,
+            )
+            return result["context"], [item["text"] for item in result["chunks"]]
+
         kb_source = (knowledge_base_text or "").strip() or (merchant_rules or "").strip()
         if not kb_source:
             return "", []
@@ -133,6 +143,7 @@ class CustomerServiceReplyEngine:
         style_hint: str | None = None,
         reply_language: str = "zh",
         knowledge_base_text: str | None = None,
+        knowledge_base_index_path: str | None = None,
         kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
@@ -168,7 +179,13 @@ class CustomerServiceReplyEngine:
             )
             return reply
 
-        context, _ = self._retrieve_context(prepared_text, merchant_rules, knowledge_base_text, kb_top_k)
+        context, _ = self._retrieve_context(
+            prepared_text,
+            merchant_rules,
+            knowledge_base_text,
+            kb_top_k,
+            knowledge_base_index_path,
+        )
         defensive_context = build_defensive_context(assessment, lang)
         system_instruction, user_prompt = self._build_messages(
             prepared_text,
@@ -267,6 +284,7 @@ class CustomerServiceReplyEngine:
         style_hint: str | None = None,
         reply_language: str = "zh",
         knowledge_base_text: str | None = None,
+        knowledge_base_index_path: str | None = None,
         kb_top_k: int = 3,
     ) -> str:
         text = _validate_review_text(review_text)
@@ -302,7 +320,13 @@ class CustomerServiceReplyEngine:
             )
             return reply
 
-        context, _ = self._retrieve_context(prepared_text, merchant_rules, knowledge_base_text, kb_top_k)
+        context, _ = self._retrieve_context(
+            prepared_text,
+            merchant_rules,
+            knowledge_base_text,
+            kb_top_k,
+            knowledge_base_index_path,
+        )
         defensive_context = build_defensive_context(assessment, lang)
         system_instruction, user_prompt = self._build_messages(
             prepared_text,
@@ -406,6 +430,7 @@ def generate_customer_service_reply_as_dict(
     style_hint: str | None = None,
     reply_language: str = "zh",
     knowledge_base_text: str | None = None,
+    knowledge_base_index_path: str | None = None,
     kb_top_k: int = 3,
 ) -> dict[str, Any]:
     engine = CustomerServiceReplyEngine(provider=provider, model=model)
@@ -414,6 +439,7 @@ def generate_customer_service_reply_as_dict(
         merchant_rules,
         knowledge_base_text,
         kb_top_k,
+        knowledge_base_index_path,
     )
     reply = engine.generate_reply(
         review_text,
@@ -423,6 +449,7 @@ def generate_customer_service_reply_as_dict(
         style_hint=style_hint,
         reply_language=reply_language,
         knowledge_base_text=knowledge_base_text,
+        knowledge_base_index_path=knowledge_base_index_path,
         kb_top_k=kb_top_k,
     )
     return {
@@ -430,8 +457,11 @@ def generate_customer_service_reply_as_dict(
         "provider": engine.provider,
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
-        "used_rules": bool((merchant_rules or "").strip() or (knowledge_base_text or "").strip()),
+        "used_rules": bool(
+            (merchant_rules or "").strip() or (knowledge_base_text or "").strip() or (knowledge_base_index_path or "").strip()
+        ),
         "retrieved_chunks": retrieved_chunks,
+        "knowledge_base_index_path": knowledge_base_index_path,
         "request_id": engine.last_request_id,
         "edge_case_flags": engine.last_edge_case_flags,
         "guardrail_action": engine.last_guardrail_action,
@@ -449,6 +479,7 @@ async def async_generate_customer_service_reply_as_dict(
     style_hint: str | None = None,
     reply_language: str = "zh",
     knowledge_base_text: str | None = None,
+    knowledge_base_index_path: str | None = None,
     kb_top_k: int = 3,
 ) -> dict[str, Any]:
     engine = CustomerServiceReplyEngine(provider=provider, model=model)
@@ -457,6 +488,7 @@ async def async_generate_customer_service_reply_as_dict(
         merchant_rules,
         knowledge_base_text,
         kb_top_k,
+        knowledge_base_index_path,
     )
     reply = await engine.async_generate_reply(
         review_text,
@@ -466,6 +498,7 @@ async def async_generate_customer_service_reply_as_dict(
         style_hint=style_hint,
         reply_language=reply_language,
         knowledge_base_text=knowledge_base_text,
+        knowledge_base_index_path=knowledge_base_index_path,
         kb_top_k=kb_top_k,
     )
     return {
@@ -473,8 +506,11 @@ async def async_generate_customer_service_reply_as_dict(
         "provider": engine.provider,
         "model": engine.model,
         "reply_language": normalize_summary_language(reply_language),
-        "used_rules": bool((merchant_rules or "").strip() or (knowledge_base_text or "").strip()),
+        "used_rules": bool(
+            (merchant_rules or "").strip() or (knowledge_base_text or "").strip() or (knowledge_base_index_path or "").strip()
+        ),
         "retrieved_chunks": retrieved_chunks,
+        "knowledge_base_index_path": knowledge_base_index_path,
         "request_id": engine.last_request_id,
         "edge_case_flags": engine.last_edge_case_flags,
         "guardrail_action": engine.last_guardrail_action,
