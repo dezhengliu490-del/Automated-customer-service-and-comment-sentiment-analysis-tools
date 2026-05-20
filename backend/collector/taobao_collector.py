@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 
-from config import get_taobao_cookie
+from config import get_taobao_cookie, normalize_cookie_string
 
 
 DEFAULT_HEADERS = {
@@ -60,12 +60,23 @@ def _parse_jsonp(text: str) -> Any:
     if not raw:
         return {}
     if raw.startswith("{") or raw.startswith("["):
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TaobaoCollectionError("评论接口返回了无效 JSON，可能已触发风控或当前页数据异常。") from exc
     start = raw.find("(")
     end = raw.rfind(")")
     if start >= 0 and end > start:
-        return json.loads(raw[start + 1 : end])
-    return json.loads(raw)
+        try:
+            return json.loads(raw[start + 1 : end])
+        except json.JSONDecodeError as exc:
+            raise TaobaoCollectionError("评论接口返回了非标准 JSONP 内容，可能已触发风控。") from exc
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        if raw.startswith("<!DOCTYPE") or raw.startswith("<html") or "<html" in raw[:200].lower():
+            raise TaobaoCollectionError("评论接口返回了 HTML 页面，通常表示风控、登录失效或页数过深。") from exc
+        raise TaobaoCollectionError("评论接口返回内容无法解析为 JSON。") from exc
 
 
 def _extract_item_id(product_url: str) -> str:
@@ -274,7 +285,7 @@ def collect_taobao_reviews(
 ) -> dict[str, Any]:
     if not (product_url or "").strip():
         raise TaobaoCollectionError("商品链接不能为空。")
-    cookie = (cookie or "").strip() or get_taobao_cookie()
+    cookie = normalize_cookie_string(cookie) or get_taobao_cookie()
     if not (cookie or "").strip():
         raise TaobaoCollectionError("需要提供登录后的 Cookie 才能在 Streamlit Cloud 中尝试采集。")
 

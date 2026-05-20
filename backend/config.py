@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 try:
@@ -15,6 +16,18 @@ except ModuleNotFoundError:  # pragma: no cover
 _ENV_PATH = Path(__file__).resolve().parent / ".env"
 # 加载环境变量
 load_dotenv(_ENV_PATH)
+
+
+def normalize_cookie_string(raw: str | None) -> str:
+    text = str(raw or "")
+    if not text.strip():
+        return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    parts = [part.strip() for part in text.split("\n") if part.strip()]
+    text = " ".join(parts)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s*;\s*", "; ", text)
+    return text.strip()
 
 
 def get_gemini_api_key() -> str:
@@ -129,12 +142,22 @@ def get_app_admin_password() -> str:
 
 
 def get_taobao_cookie() -> str:
-    return (
+    raw = (
         os.environ.get("TAOBAO_COOKIE")
         or os.environ.get("COOKIE")
         or os.environ.get("cookie")
         or ""
-    ).strip()
+    )
+    return normalize_cookie_string(raw)
+
+
+def get_amazon_cookie() -> str:
+    raw = (
+        os.environ.get("AMAZON_COOKIE")
+        or os.environ.get("amazon_cookie")
+        or ""
+    )
+    return normalize_cookie_string(raw)
 
 
 def get_kb_index_dir() -> Path:

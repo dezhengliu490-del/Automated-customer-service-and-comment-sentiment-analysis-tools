@@ -23,6 +23,7 @@ if str(_BACKEND) not in sys.path:
 
 from llm_factory import get_llm_service
 from customer_service import generate_customer_service_reply_as_dict
+from collector.amazon_collector import AmazonCollectionError, collect_amazon_reviews
 from collector.taobao_collector import TaobaoCollectionError, collect_taobao_reviews
 from insights import top_pain_points_from_results
 from rag_utils import SimpleRAGIndex
@@ -40,12 +41,14 @@ from task_manager import BatchAnalysisTaskManager
 from config import (
     get_app_access_password,
     get_app_admin_password,
+    get_amazon_cookie,
     get_app_db_path,
     get_llm_concurrency,
     get_llm_log_path,
     get_llm_max_retries,
     get_llm_rate_limit_rps,
     get_llm_timeout_seconds,
+    normalize_cookie_string,
     get_taobao_cookie,
 )
 
@@ -422,7 +425,28 @@ def _get_configured_taobao_cookie() -> str:
                         break
     except Exception:
         secret_value = None
-    return str(secret_value or get_taobao_cookie() or "").strip()
+    return normalize_cookie_string(secret_value or get_taobao_cookie() or "")
+
+
+def _get_configured_amazon_cookie() -> str:
+    secret_value = None
+    try:
+        for key in ("AMAZON_COOKIE", "amazon_cookie"):
+            candidate = st.secrets.get(key)
+            if candidate:
+                secret_value = candidate
+                break
+        if not secret_value:
+            amazon_section = st.secrets.get("amazon")
+            if isinstance(amazon_section, Mapping):
+                for key in ("cookie", "AMAZON_COOKIE", "amazon_cookie"):
+                    candidate = amazon_section.get(key)
+                    if candidate:
+                        secret_value = candidate
+                        break
+    except Exception:
+        secret_value = None
+    return normalize_cookie_string(secret_value or get_amazon_cookie() or "")
 
 
 def _clear_login_session() -> None:
@@ -600,7 +624,8 @@ def _persist_upload(upload_info: dict[str, Any], upload_signature: str) -> None:
 
 
 def _activate_collected_reviews(df_new: pd.DataFrame, result: dict[str, Any]) -> None:
-    filename = f"taobao_reviews_{result.get('item_id', 'collected')}.csv"
+    platform = str(result.get("platform", "collected") or "collected").lower()
+    filename = f"{platform}_reviews_{result.get('item_id', 'collected')}.csv"
     upload_info = {
         "name": filename,
         "size": int(len(_dataframe_to_csv_bytes(df_new))),
@@ -1028,35 +1053,58 @@ def _render_admin_center(i18n: dict[str, str]) -> None:
 def _render_collect_center(i18n: dict[str, str]) -> None:
     st.subheader(i18n["collect_title"])
     st.caption(i18n["collect_hint"])
+    platform = st.selectbox(
+        i18n["collect_platform"],
+        options=["taobao", "amazon"],
+        format_func=lambda value: i18n["collect_platform_taobao"] if value == "taobao" else i18n["collect_platform_amazon"],
+        key="collect_platform",
+    )
     configured_cookie = _get_configured_taobao_cookie()
-    if configured_cookie:
+    configured_amazon_cookie = _get_configured_amazon_cookie()
+    if platform == "taobao" and configured_cookie:
         st.caption(i18n["collect_cookie_configured"])
+    if platform == "amazon" and configured_amazon_cookie:
+        st.caption(i18n["collect_amazon_cookie_configured"])
 
-    with st.form("taobao_collect_form", clear_on_submit=False):
+    with st.form("review_collect_form", clear_on_submit=False):
         product_url = st.text_input(i18n["collect_url"], key="collect_product_url")
-        cookie = st.text_area(i18n["collect_cookie"], height=120, key="collect_cookie")
-        form_cols = st.columns(3)
+        cookie = ""
+        seller_id = ""
+        if platform == "taobao":
+            cookie = st.text_area(i18n["collect_cookie"], height=120, key="collect_cookie")
+        else:
+            cookie = st.text_area(i18n["collect_amazon_cookie"], height=120, key="collect_amazon_cookie")
+        form_cols = st.columns(3 if platform == "taobao" else 1)
         with form_cols[0]:
             pages = st.number_input(i18n["collect_pages"], min_value=1, max_value=10, value=1, step=1)
-        with form_cols[1]:
-            page_size = st.number_input(i18n["collect_page_size"], min_value=5, max_value=50, value=20, step=5)
-        with form_cols[2]:
-            seller_id = st.text_input(i18n["collect_seller_id"], key="collect_seller_id")
+        page_size = 20
+        if platform == "taobao":
+            with form_cols[1]:
+                page_size = st.number_input(i18n["collect_page_size"], min_value=5, max_value=50, value=20, step=5)
+            with form_cols[2]:
+                seller_id = st.text_input(i18n["collect_seller_id"], key="collect_seller_id")
         submit = st.form_submit_button(i18n["collect_submit"], type="primary", use_container_width=True)
 
     if submit:
         try:
             with st.spinner(i18n["collect_running"]):
-                result = collect_taobao_reviews(
-                    product_url=product_url,
-                    cookie=(cookie or "").strip() or configured_cookie,
-                    pages=int(pages),
-                    page_size=int(page_size),
-                    seller_id_override=seller_id.strip() or None,
-                )
+                if platform == "taobao":
+                    result = collect_taobao_reviews(
+                        product_url=product_url,
+                        cookie=(cookie or "").strip() or configured_cookie,
+                        pages=int(pages),
+                        page_size=int(page_size),
+                        seller_id_override=seller_id.strip() or None,
+                    )
+                else:
+                    result = collect_amazon_reviews(
+                        product_url=product_url,
+                        cookie=(cookie or "").strip() or configured_amazon_cookie,
+                        pages=int(pages),
+                    )
             st.session_state[SS_COLLECT_RESULT] = result
             st.success(i18n["collect_success"].format(count=int(result.get("review_count", 0) or 0)))
-        except TaobaoCollectionError as exc:
+        except (TaobaoCollectionError, AmazonCollectionError) as exc:
             st.error(i18n["collect_error"].format(error=exc))
         except Exception as exc:
             st.error(i18n["collect_error"].format(error=exc))
@@ -1077,13 +1125,21 @@ def _render_collect_center(i18n: dict[str, str]) -> None:
     info_cols[2].metric(i18n["collect_metric_item"], str(result.get("item_id", "-")))
     info_cols[3].metric(i18n["collect_metric_pages"], int(result.get("pages_requested", 0) or 0))
     st.caption(
-        i18n["collect_meta"].format(
-            title=result.get("product_name", "-"),
-            seller=result.get("seller_id", "-") or "-",
+        (
+            i18n["collect_meta_taobao"].format(
+                title=result.get("product_name", "-"),
+                seller=result.get("seller_id", "-") or "-",
+            )
+            if str(result.get("platform", "")).lower() == "taobao"
+            else i18n["collect_meta_amazon"].format(
+                title=result.get("product_name", "-"),
+                marketplace=result.get("marketplace", "amazon.com"),
+            )
         )
     )
 
     if result.get("warnings"):
+        st.caption(i18n["collect_warning_partial"])
         st.warning(" | ".join(str(x) for x in result.get("warnings", [])[:3]))
 
     action_cols = st.columns([1, 1])
@@ -1096,7 +1152,7 @@ def _render_collect_center(i18n: dict[str, str]) -> None:
         st.download_button(
             i18n["collect_download_csv"],
             data=_dataframe_to_csv_bytes(preview_df),
-            file_name=f"taobao_reviews_{result.get('item_id', 'collected')}.csv",
+            file_name=f"{str(result.get('platform', 'collected')).lower()}_reviews_{result.get('item_id', 'collected')}.csv",
             mime="text/csv",
             key="collect_download_csv_btn",
             use_container_width=True,
@@ -2345,11 +2401,16 @@ with st.sidebar:
             "cs_error": "生成失败：{e}",
             "cs_warn_empty": "请输入用户评论或提问。",
             "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
-            "collect_title": "淘宝评论采集",
-            "collect_hint": "这是适配 Streamlit Cloud 的轻量采集方式：输入商品链接和登录后的 Cookie，尝试直接抓取评论并转成当前工作区数据。",
+            "collect_title": "评论采集",
+            "collect_hint": "这是适配 Streamlit Cloud 的轻量采集方式：可选择淘宝/天猫或 Amazon，采集成功后可直接载入当前工作区继续分析。",
+            "collect_platform": "采集平台",
+            "collect_platform_taobao": "淘宝 / 天猫",
+            "collect_platform_amazon": "Amazon",
             "collect_url": "商品链接",
             "collect_cookie": "登录 Cookie（可选覆盖）",
             "collect_cookie_configured": "已检测到已配置的淘宝 Cookie，当前可直接采集；如需临时覆盖，可在下方粘贴新的 Cookie。",
+            "collect_amazon_cookie": "Amazon Cookie（可选覆盖）",
+            "collect_amazon_cookie_configured": "已检测到已配置的 Amazon Cookie，当前可直接采集；如需临时覆盖，可在下方粘贴新的 Cookie。",
             "collect_pages": "采集页数",
             "collect_page_size": "每页条数",
             "collect_seller_id": "seller_id（天猫可选手填）",
@@ -2358,11 +2419,13 @@ with st.sidebar:
             "collect_success": "采集成功，共获取 {count} 条评论。",
             "collect_error": "采集失败：{error}",
             "collect_empty": "当前还没有采集结果。",
+            "collect_warning_partial": "采集已部分完成：前面页数的数据可正常使用；以下提示表示后续页未继续抓取。",
             "collect_metric_reviews": "评论数",
             "collect_metric_platform": "平台",
             "collect_metric_item": "商品 ID",
             "collect_metric_pages": "页数",
-            "collect_meta": "商品：{title} | seller_id：{seller}",
+            "collect_meta_taobao": "商品：{title} | seller_id：{seller}",
+            "collect_meta_amazon": "商品：{title} | 站点：{marketplace}",
             "collect_use_dataset": "载入当前工作区",
             "collect_dataset_ready": "采集结果已载入当前工作区，可以直接去批量分析。",
             "collect_download_csv": "下载采集 CSV",
@@ -2618,11 +2681,16 @@ with st.sidebar:
             "cs_error": "Generation failed: {e}",
             "cs_warn_empty": "Please enter a review or question.",
             "cs_meta": "Provider: {provider} | Model: {model} | Rules used: {used_rules} | Request: {request_id} | Guard: {guardrail}",
-            "collect_title": "Taobao Review Collector",
-            "collect_hint": "This is a lightweight Streamlit Cloud-friendly collector: provide a product URL and a logged-in Cookie, then try to fetch review data directly into the current workspace.",
+            "collect_title": "Review Collector",
+            "collect_hint": "This is a lightweight Streamlit Cloud-friendly collector: choose Taobao/Tmall or Amazon, fetch reviews, and load them directly into the current workspace.",
+            "collect_platform": "Platform",
+            "collect_platform_taobao": "Taobao / Tmall",
+            "collect_platform_amazon": "Amazon",
             "collect_url": "Product URL",
             "collect_cookie": "Logged-in Cookie (optional override)",
             "collect_cookie_configured": "A configured Taobao cookie was detected. Collection can run directly; paste a new one below only if you need to override it temporarily.",
+            "collect_amazon_cookie": "Amazon Cookie (optional override)",
+            "collect_amazon_cookie_configured": "A configured Amazon cookie was detected. Collection can run directly; paste a new one below only if you need to override it temporarily.",
             "collect_pages": "Pages to fetch",
             "collect_page_size": "Rows per page",
             "collect_seller_id": "seller_id (optional for Tmall)",
@@ -2631,11 +2699,13 @@ with st.sidebar:
             "collect_success": "Collection completed with {count} reviews.",
             "collect_error": "Collection failed: {error}",
             "collect_empty": "No collected reviews yet.",
+            "collect_warning_partial": "Collection completed partially: earlier pages are usable; the message below only means later pages were not fetched.",
             "collect_metric_reviews": "Reviews",
             "collect_metric_platform": "Platform",
             "collect_metric_item": "Item ID",
             "collect_metric_pages": "Pages",
-            "collect_meta": "Product: {title} | seller_id: {seller}",
+            "collect_meta_taobao": "Product: {title} | seller_id: {seller}",
+            "collect_meta_amazon": "Product: {title} | marketplace: {marketplace}",
             "collect_use_dataset": "Use as current dataset",
             "collect_dataset_ready": "Collected reviews are now loaded into the workspace and ready for batch analysis.",
             "collect_download_csv": "Download collected CSV",
